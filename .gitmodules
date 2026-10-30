@@ -1,0 +1,6 @@
+[submodule "server/vendor/spdlog"]
+	path = server/vendor/spdlog
+	url = https://github.com/gabime/spdlog
+[submodule "server/vendor/googletest"]
+	path = server/vendor/googletest
+	url = https://github.com/google/googletest.git

@@ -1,0 +1,5 @@
+.vscode/*
+
+server/build/   
+server/doxygen/
+server/logs/
