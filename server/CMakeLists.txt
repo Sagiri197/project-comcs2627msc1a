@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.14)
+cmake_minimum_required(VERSION 3.18)
 
-project(alert_server VERSION 1.0 LANGUAGES CXX)
+project(alert_server VERSION 1.0 LANGUAGES C CXX)
 
 include(CTest)
 
@@ -28,7 +28,7 @@ if(DOXYGEN_FOUND)
     )
 endif()
 
-add_subdirectory(vendor/spdlog)
+add_subdirectory(vendor)
 
 if(BUILD_TESTING)
     if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/googletest/CMakeLists.txt")
@@ -39,5 +39,6 @@ if(BUILD_TESTING)
     add_subdirectory(vendor/googletest)
 endif()
 
+add_subdirectory(../common "${CMAKE_CURRENT_BINARY_DIR}/common")
 add_subdirectory(udp)
 add_subdirectory(daemon)
