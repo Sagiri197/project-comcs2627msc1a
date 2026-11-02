@@ -12,4 +12,5 @@ if(BUILD_TESTING)
 
     include(GoogleTest)
     gtest_discover_tests(udp_socket_tests NO_PRETTY_VALUES PROPERTIES TIMEOUT 5)
+
 endif()

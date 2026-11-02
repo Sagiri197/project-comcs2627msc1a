@@ -1,0 +1,10 @@
+add_library(persistency src/reading_store.cpp)
+target_include_directories(persistency PUBLIC include)
+target_link_libraries(persistency PUBLIC common::protocol PRIVATE SQLite::SQLite3)
+
+if(BUILD_TESTING)
+    add_executable(reading_store_tests tests/reading_store_test.cpp)
+    target_link_libraries(reading_store_tests PRIVATE persistency SQLite::SQLite3 GTest::gtest_main)
+    include(GoogleTest)
+    gtest_discover_tests(reading_store_tests PROPERTIES TIMEOUT 5)
+endif()
