@@ -3,9 +3,9 @@
 #include <nlohmann/json.hpp>
 
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <limits>
-#include <type_traits>
 #include <unordered_set>
 #include <vector>
 
@@ -18,17 +18,7 @@ using Json = nlohmann::json;
     throw ProtocolError(code, message);
 }
 
-const Json& field(const Json& object, const char* name, ErrorCode code) {
-    if (!object.is_object() || !object.contains(name)) {
-        fail(code, std::string("Missing field: ") + name);
-    }
-    return object.at(name);
-}
-
-std::string text(const Json& value, std::size_t maximum, ErrorCode code) {
-    if (!value.is_string()) {
-        fail(code, "Expected a string");
-    }
+std::string text(const Json& value, std::size_t maximum, ErrorCode code = ErrorCode::InvalidMessage) {
     const auto& result = value.get_ref<const std::string&>();
     if (result.empty() || result.size() > maximum) {
         fail(code, "String length is outside protocol limits");
@@ -42,22 +32,16 @@ std::string text(const Json& value, std::size_t maximum, ErrorCode code) {
 }
 
 std::string identifier(const Json& value) {
-    auto result = text(value, 64, ErrorCode::InvalidMessage);
-    for (unsigned char character : result) {
-        if (!((character >= 'a' && character <= 'z') ||
-              (character >= 'A' && character <= 'Z') ||
-              (character >= '0' && character <= '9') ||
-              character == '-' || character == '_' || character == '.')) {
-            fail(ErrorCode::InvalidMessage, "Invalid node or session identifier");
-        }
+    auto result = text(value, 64);
+    if (result.find_first_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_.")
+        != std::string::npos) {
+        fail(ErrorCode::InvalidMessage, "Invalid node or session identifier");
     }
     return result;
 }
 
 std::uint32_t unsigned_integer(const Json& value) {
-    if (!value.is_number_integer() ||
-        (!value.is_number_unsigned() && value.get<std::int64_t>() < 0) ||
-        value.get<std::uint64_t>() > std::numeric_limits<std::uint32_t>::max()) {
+    if (!value.is_number_integer() || value < 0 || value > std::numeric_limits<std::uint32_t>::max()) {
         fail(ErrorCode::InvalidMessage, "Expected an unsigned 32-bit integer");
     }
     return value.get<std::uint32_t>();
@@ -71,32 +55,26 @@ double number(const Json& value) {
 }
 
 bool valid_timestamp(const std::string& value) {
-    if (value.size() < 20 || value[4] != '-' || value[7] != '-' ||
-        value[10] != 'T' || value[13] != ':' || value[16] != ':' || value.back() != 'Z') {
+    if (value.size() < 20 || value.size() > 30 || value.back() != 'Z') {
         return false;
     }
-    if (value.size() != 20 &&
-        (value.size() < 22 || value.size() > 30 || value[19] != '.')) {
-        return false;
-    }
-    for (std::size_t index = 0; index < value.size() - 1; ++index) {
-        if (index == 4 || index == 7 || index == 10 || index == 13 || index == 16 ||
-            (index == 19 && value.size() != 20)) {
-            continue;
-        }
-        if (value[index] < '0' || value[index] > '9') {
+    const std::string format = "dddd-dd-ddTdd:dd:dd";
+    for (std::size_t index = 0; index < format.size(); ++index) {
+        if (format[index] == 'd' ? value[index] < '0' || value[index] > '9'
+                                 : value[index] != format[index]) {
             return false;
         }
     }
-    const int year = std::stoi(value.substr(0, 4));
-    const int month = std::stoi(value.substr(5, 2));
-    const int day = std::stoi(value.substr(8, 2));
-    if (year == 0 || month < 1 || month > 12) {
+    if (value.size() != 20 && (value.size() < 22 || value[19] != '.' ||
+        value.substr(20, value.size() - 21).find_first_not_of("0123456789") != std::string::npos)) {
         return false;
     }
-    const bool leap = year % 4 == 0 && (year % 100 != 0 || year % 400 == 0);
-    const std::array<int, 12> days{31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
-    return day >= 1 && day <= days[month - 1] &&
+    const std::chrono::year_month_day date{
+        std::chrono::year{std::stoi(value.substr(0, 4))},
+        std::chrono::month{static_cast<unsigned>(std::stoi(value.substr(5, 2)))},
+        std::chrono::day{static_cast<unsigned>(std::stoi(value.substr(8, 2)))}};
+
+    return date.year() != std::chrono::year{0} && date.ok() &&
            std::stoi(value.substr(11, 2)) <= 23 &&
            std::stoi(value.substr(14, 2)) <= 59 &&
            std::stoi(value.substr(17, 2)) <= 59;
@@ -117,109 +95,96 @@ std::string urn(const Json& value, std::string_view prefix) {
 
 WeatherObserved observation(const Json& payload) {
     constexpr auto invalid = ErrorCode::InvalidPayload;
-    if (field(payload, "type", invalid) != "WeatherObserved") {
-        fail(invalid, "Expected WeatherObserved payload");
+    try {
+        if (payload.at("type") != "WeatherObserved") fail(invalid, "Expected WeatherObserved payload");
+        auto timestamp = text(payload.at("dateObserved"), 30, invalid);
+        if (!valid_timestamp(timestamp)) fail(invalid, "Expected a valid UTC timestamp ending in Z");
+        const auto& location = payload.at("location");
+        if (location.at("type") != "Point") fail(invalid, "Expected a GeoJSON Point");
+        const auto& coordinates = location.at("coordinates");
+        if (!coordinates.is_array() || coordinates.size() != 2) {
+            fail(invalid, "Expected longitude and latitude");
+        }
+        const GeoPoint point{number(coordinates[0]), number(coordinates[1])};
+        if (point.longitude < -180 || point.longitude > 180 || point.latitude < -90 || point.latitude > 90) {
+            fail(invalid, "Coordinates are outside geographic bounds");
+        }
+        const double humidity = number(payload.at("relativeHumidity"));
+        if (humidity < 0 || humidity > 1) fail(invalid, "relativeHumidity must be a fraction between 0 and 1");
+        return {urn(payload.at("id"), "urn:ngsi-ld:WeatherObserved:"), timestamp, point,
+                urn(payload.at("refDevice"), "urn:ngsi-ld:Device:"),
+                number(payload.at("temperature")), humidity};
+    } catch (const Json::exception& error) {
+        fail(invalid, error.what());
     }
-    auto timestamp = text(field(payload, "dateObserved", invalid), 30, invalid);
-    if (!valid_timestamp(timestamp)) {
-        fail(invalid, "Expected a valid UTC timestamp ending in Z");
-    }
-    const auto& location = field(payload, "location", invalid);
-    if (field(location, "type", invalid) != "Point") {
-        fail(invalid, "Expected a GeoJSON Point");
-    }
-    const auto& coordinates = field(location, "coordinates", invalid);
-    if (!coordinates.is_array() || coordinates.size() != 2) {
-        fail(invalid, "Expected longitude and latitude");
-    }
-    const GeoPoint point{number(coordinates[0]), number(coordinates[1])};
-    if (point.longitude < -180 || point.longitude > 180 ||
-        point.latitude < -90 || point.latitude > 90) {
-        fail(invalid, "Coordinates are outside geographic bounds");
-    }
-    const double humidity = number(field(payload, "relativeHumidity", invalid));
-    if (humidity < 0 || humidity > 1) {
-        fail(invalid, "relativeHumidity must be a fraction between 0 and 1");
-    }
-    return {urn(field(payload, "id", invalid), "urn:ngsi-ld:WeatherObserved:"),
-            timestamp, point,
-            urn(field(payload, "refDevice", invalid), "urn:ngsi-ld:Device:"),
-            number(field(payload, "temperature", invalid)), humidity};
 }
 
+constexpr std::array<const char*, 4> reject_codes{
+    "invalid_message", "unsupported_version", "invalid_payload", "identity_conflict"};
+
 std::string reject_code(RejectCode code) {
-    switch (code) {
-    case RejectCode::InvalidMessage: return "invalid_message";
-    case RejectCode::UnsupportedVersion: return "unsupported_version";
-    case RejectCode::InvalidPayload: return "invalid_payload";
-    case RejectCode::IdentityConflict: return "identity_conflict";
-    }
+    const auto index = static_cast<std::size_t>(code);
+    if (index < reject_codes.size()) return reject_codes[index];
     fail(ErrorCode::InvalidMessage, "Unknown rejection code");
 }
 
 RejectCode reject_code(const Json& value) {
-    const auto code = text(value, 32, ErrorCode::InvalidMessage);
-    if (code == "invalid_message") return RejectCode::InvalidMessage;
-    if (code == "unsupported_version") return RejectCode::UnsupportedVersion;
-    if (code == "invalid_payload") return RejectCode::InvalidPayload;
-    if (code == "identity_conflict") return RejectCode::IdentityConflict;
+    const auto code = text(value, 32);
+    for (std::size_t index = 0; index < reject_codes.size(); ++index) {
+        if (code == reject_codes[index]) return static_cast<RejectCode>(index);
+    }
     fail(ErrorCode::InvalidMessage, "Unknown rejection code");
 }
 
 Message decode_json(const Json& document) {
-    constexpr auto invalid = ErrorCode::InvalidMessage;
-    if (unsigned_integer(field(document, "version", invalid)) != version) {
-        fail(ErrorCode::UnsupportedVersion, "Unsupported protocol version");
+    try {
+        if (unsigned_integer(document.at("version")) != version) {
+            fail(ErrorCode::UnsupportedVersion, "Unsupported protocol version");
+        }
+        const auto kind = text(document.at("kind"), 16);
+        Identity identity{identifier(document.at("nodeId")), identifier(document.at("sessionId")),
+                          unsigned_integer(document.at("seq"))};
+        if (kind == "ack") return Ack{identity};
+        if (kind == "reject") {
+            return Reject{identity, reject_code(document.at("code")), text(document.at("reason"), 256)};
+        }
+        if (kind != "reading") fail(ErrorCode::UnsupportedKind, "Unsupported message kind");
+        const auto qos = unsigned_integer(document.at("qos"));
+        if (qos > 1) fail(ErrorCode::InvalidMessage, "Unsupported QoS");
+        const auto synchronized = document.value("timeSynchronized", Json(true));
+        if (!synchronized.is_boolean()) fail(ErrorCode::InvalidMessage, "timeSynchronized must be boolean");
+        return Reading{identity, static_cast<Qos>(qos), observation(document.value("payload", Json())),
+                       synchronized.get<bool>()};
+    } catch (const Json::exception& error) {
+        fail(ErrorCode::InvalidMessage, error.what());
     }
-    const auto kind = text(field(document, "kind", invalid), 16, invalid);
-    Identity identity{identifier(field(document, "nodeId", invalid)),
-                      identifier(field(document, "sessionId", invalid)),
-                      unsigned_integer(field(document, "seq", invalid))};
-    if (kind == "ack") return Ack{identity};
-    if (kind == "reject") {
-        return Reject{identity, reject_code(field(document, "code", invalid)),
-                      text(field(document, "reason", invalid), 256, invalid)};
-    }
-    if (kind != "reading") {
-        fail(ErrorCode::UnsupportedKind, "Unsupported message kind");
-    }
-    const auto qos = unsigned_integer(field(document, "qos", invalid));
-    if (qos > 1) fail(invalid, "Unsupported QoS");
-    bool synchronized = true;
-    if (document.contains("timeSynchronized")) {
-        const auto& value = document.at("timeSynchronized");
-        if (!value.is_boolean()) fail(invalid, "timeSynchronized must be boolean");
-        synchronized = value.get<bool>();
-    }
-    return Reading{identity, static_cast<Qos>(qos),
-                   observation(field(document, "payload", ErrorCode::InvalidPayload)), synchronized};
+}
+
+Json envelope(const Identity& identity, const char* kind) {
+    return {{"version", version}, {"kind", kind}, {"nodeId", identity.node_id},
+            {"sessionId", identity.session_id}, {"seq", identity.seq}};
 }
 
 Json to_json(const Message& message) {
-    return std::visit([](const auto& typed) {
-        Json document{{"version", version}, {"nodeId", typed.identity.node_id},
-                      {"sessionId", typed.identity.session_id}, {"seq", typed.identity.seq}};
-        using Type = std::decay_t<decltype(typed)>;
-        if constexpr (std::is_same_v<Type, Reading>) {
-            const auto& payload = typed.payload;
-            document["kind"] = "reading";
-            document["qos"] = static_cast<int>(typed.qos);
-            document["timeSynchronized"] = typed.time_synchronized;
-            document["payload"] = {
-                {"id", payload.id}, {"type", "WeatherObserved"},
-                {"dateObserved", payload.date_observed}, {"refDevice", payload.ref_device},
-                {"location", {{"type", "Point"},
-                              {"coordinates", {payload.location.longitude, payload.location.latitude}}}},
-                {"temperature", payload.temperature}, {"relativeHumidity", payload.relative_humidity}};
-        } else if constexpr (std::is_same_v<Type, Ack>) {
-            document["kind"] = "ack";
-        } else {
-            document["kind"] = "reject";
-            document["code"] = reject_code(typed.code);
-            document["reason"] = typed.reason;
-        }
+    if (const auto* reading = std::get_if<Reading>(&message)) {
+        auto document = envelope(reading->identity, "reading");
+        const auto& payload = reading->payload;
+        document["qos"] = static_cast<int>(reading->qos);
+        document["timeSynchronized"] = reading->time_synchronized;
+        document["payload"] = {
+            {"id", payload.id}, {"type", "WeatherObserved"},
+            {"dateObserved", payload.date_observed}, {"refDevice", payload.ref_device},
+            {"location", {{"type", "Point"},
+                          {"coordinates", {payload.location.longitude, payload.location.latitude}}}},
+            {"temperature", payload.temperature}, {"relativeHumidity", payload.relative_humidity}};
         return document;
-    }, message);
+    }
+    if (const auto* ack = std::get_if<Ack>(&message)) return envelope(ack->identity, "ack");
+    const auto& reject = std::get<Reject>(message);
+    auto document = envelope(reject.identity, "reject");
+    document["code"] = reject_code(reject.code);
+    document["reason"] = reject.reason;
+    return document;
 }
 
 }

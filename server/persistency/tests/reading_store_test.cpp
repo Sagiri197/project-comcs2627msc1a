@@ -44,24 +44,19 @@ protected:
     }
 };
 
-TEST_F(ReadingStoreTest, StoresAndRetrievesCompleteReadingAsPending) {
+TEST_F(ReadingStoreTest, StoresAndRetrievesCompleteReading) {
     ReadingStore store(path);
     auto original = reading();
     original.time_synchronized = false;
     EXPECT_EQ(store.save(original), SaveResult::Inserted);
     const auto stored = store.find(original.identity);
     ASSERT_TRUE(stored);
-    EXPECT_EQ(encode(stored->reading), encode(original));
-    EXPECT_FALSE(stored->processed);
-    ASSERT_EQ(store.pending().size(), 1);
-    EXPECT_EQ(encode(store.pending().front()), encode(original));
+    EXPECT_EQ(encode(*stored), encode(original));
 }
 
 TEST_F(ReadingStoreTest, ReturnsNoReadingForUnknownIdentity) {
     ReadingStore store(path);
     EXPECT_FALSE(store.find(reading().identity));
-    EXPECT_TRUE(store.pending().empty());
-    EXPECT_FALSE(store.mark_processed(reading().identity));
 }
 
 TEST_F(ReadingStoreTest, IdenticalRetriesDoNotInsertAnotherReading) {
@@ -69,7 +64,8 @@ TEST_F(ReadingStoreTest, IdenticalRetriesDoNotInsertAnotherReading) {
     EXPECT_EQ(store.save(reading()), SaveResult::Inserted);
     EXPECT_EQ(store.save(reading()), SaveResult::Duplicate);
     EXPECT_EQ(store.save(reading()), SaveResult::Duplicate);
-    EXPECT_EQ(store.pending().size(), 1);
+    ASSERT_TRUE(store.find(reading().identity));
+    EXPECT_EQ(encode(*store.find(reading().identity)), encode(reading()));
 }
 
 TEST_F(ReadingStoreTest, ConflictingIdentityDoesNotOverwriteOriginal) {
@@ -85,8 +81,7 @@ TEST_F(ReadingStoreTest, ConflictingIdentityDoesNotOverwriteOriginal) {
     conflicting = original;
     conflicting.qos = Qos::BestEffort;
     EXPECT_EQ(store.save(conflicting), SaveResult::IdentityConflict);
-    EXPECT_EQ(encode(store.find(original.identity)->reading), encode(original));
-    EXPECT_EQ(store.pending().size(), 1);
+    EXPECT_EQ(encode(*store.find(original.identity)), encode(original));
 }
 
 TEST_F(ReadingStoreTest, NodeSessionAndSequenceAllParticipateInIdentity) {
@@ -96,13 +91,16 @@ TEST_F(ReadingStoreTest, NodeSessionAndSequenceAllParticipateInIdentity) {
     auto other = original;
     other.identity.node_id = "esp32-b";
     EXPECT_EQ(store.save(other), SaveResult::Inserted);
+    EXPECT_TRUE(store.find(other.identity));
     other = original;
     other.identity.session_id = "boot-2";
     EXPECT_EQ(store.save(other), SaveResult::Inserted);
+    EXPECT_TRUE(store.find(other.identity));
     other = original;
     ++other.identity.seq;
     EXPECT_EQ(store.save(other), SaveResult::Inserted);
-    EXPECT_EQ(store.pending().size(), 4);
+    EXPECT_TRUE(store.find(other.identity));
+    EXPECT_TRUE(store.find(original.identity));
 }
 
 TEST_F(ReadingStoreTest, SupportsSequenceNumberBoundaries) {
@@ -112,36 +110,25 @@ TEST_F(ReadingStoreTest, SupportsSequenceNumberBoundaries) {
         original.identity.seq = sequence;
         ASSERT_EQ(store.save(original), SaveResult::Inserted);
         ASSERT_TRUE(store.find(original.identity));
-        EXPECT_EQ(store.find(original.identity)->reading.identity.seq, sequence);
+        EXPECT_EQ(store.find(original.identity)->identity.seq, sequence);
     }
 }
 
-TEST_F(ReadingStoreTest, MarksProcessedWithoutLosingDeduplicationState) {
-    ReadingStore store(path);
-    ASSERT_EQ(store.save(reading()), SaveResult::Inserted);
-    EXPECT_TRUE(store.mark_processed(reading().identity));
-    EXPECT_FALSE(store.mark_processed(reading().identity));
-    EXPECT_TRUE(store.pending().empty());
-    EXPECT_TRUE(store.find(reading().identity)->processed);
-    EXPECT_EQ(store.save(reading()), SaveResult::Duplicate);
-    EXPECT_TRUE(store.pending().empty());
-}
-
-TEST_F(ReadingStoreTest, RecoversPendingAndProcessedStateAfterReopen) {
-    auto processed = reading();
-    ++processed.identity.seq;
+TEST_F(ReadingStoreTest, RecoversReadingsAndDeduplicationAfterReopen) {
+    auto other = reading();
+    ++other.identity.seq;
     {
         ReadingStore store(path);
         ASSERT_EQ(store.save(reading()), SaveResult::Inserted);
-        ASSERT_EQ(store.save(processed), SaveResult::Inserted);
-        ASSERT_TRUE(store.mark_processed(processed.identity));
+        ASSERT_EQ(store.save(other), SaveResult::Inserted);
     }
     ReadingStore reopened(path);
     EXPECT_EQ(reopened.save(reading()), SaveResult::Duplicate);
-    EXPECT_EQ(reopened.save(processed), SaveResult::Duplicate);
-    EXPECT_TRUE(reopened.find(processed.identity)->processed);
-    ASSERT_EQ(reopened.pending().size(), 1);
-    EXPECT_EQ(encode(reopened.pending().front()), encode(reading()));
+    EXPECT_EQ(reopened.save(other), SaveResult::Duplicate);
+    ASSERT_TRUE(reopened.find(other.identity));
+    EXPECT_EQ(encode(*reopened.find(other.identity)), encode(other));
+    ASSERT_TRUE(reopened.find(reading().identity));
+    EXPECT_EQ(encode(*reopened.find(reading().identity)), encode(reading()));
 }
 
 TEST_F(ReadingStoreTest, RecoversCommittedReadingAfterAbruptProcessExit) {
@@ -162,23 +149,8 @@ TEST_F(ReadingStoreTest, RecoversCommittedReadingAfterAbruptProcessExit) {
     ASSERT_EQ(WEXITSTATUS(status), 0);
     ReadingStore recovered(path);
     EXPECT_EQ(recovered.save(reading()), SaveResult::Duplicate);
-    ASSERT_EQ(recovered.pending().size(), 1);
-    EXPECT_EQ(encode(recovered.pending().front()), encode(reading()));
-}
-
-TEST_F(ReadingStoreTest, PendingIsBoundedAndDeterministicallyOrdered) {
-    ReadingStore store(path);
-    auto original = reading();
-    for (auto sequence : {3U, 1U, 2U}) {
-        original.identity.seq = sequence;
-        ASSERT_EQ(store.save(original), SaveResult::Inserted);
-    }
-    EXPECT_TRUE(store.pending(0).empty());
-    const auto pending = store.pending(2);
-    ASSERT_EQ(pending.size(), 2);
-    EXPECT_EQ(pending[0].identity.seq, 1);
-    EXPECT_EQ(pending[1].identity.seq, 2);
-    EXPECT_EQ(store.pending(10).size(), 3);
+    ASSERT_TRUE(recovered.find(reading().identity));
+    EXPECT_EQ(encode(*recovered.find(reading().identity)), encode(reading()));
 }
 
 TEST_F(ReadingStoreTest, IndependentConnectionsObserveCommittedReadings) {
@@ -187,8 +159,7 @@ TEST_F(ReadingStoreTest, IndependentConnectionsObserveCommittedReadings) {
     ASSERT_EQ(first.save(reading()), SaveResult::Inserted);
     ASSERT_TRUE(second.find(reading().identity));
     EXPECT_EQ(second.save(reading()), SaveResult::Duplicate);
-    EXPECT_TRUE(second.mark_processed(reading().identity));
-    EXPECT_TRUE(first.find(reading().identity)->processed);
+    EXPECT_EQ(encode(*second.find(reading().identity)), encode(*first.find(reading().identity)));
 }
 
 TEST_F(ReadingStoreTest, RejectsInvalidProtocolWithoutWriting) {
@@ -196,7 +167,7 @@ TEST_F(ReadingStoreTest, RejectsInvalidProtocolWithoutWriting) {
     auto invalid = reading();
     invalid.payload.relative_humidity = 56;
     EXPECT_THROW(store.save(invalid), ProtocolError);
-    EXPECT_TRUE(store.pending().empty());
+    EXPECT_FALSE(store.find(invalid.identity));
 }
 
 TEST_F(ReadingStoreTest, UsesBoundParametersForUntrustedText) {
@@ -204,7 +175,7 @@ TEST_F(ReadingStoreTest, UsesBoundParametersForUntrustedText) {
     auto original = reading();
     original.payload.id = "urn:ngsi-ld:WeatherObserved:';DROP_TABLE_readings;--";
     ASSERT_EQ(store.save(original), SaveResult::Inserted);
-    EXPECT_EQ(encode(store.find(original.identity)->reading), encode(original));
+    EXPECT_EQ(encode(*store.find(original.identity)), encode(original));
     auto next = reading();
     ++next.identity.seq;
     EXPECT_EQ(store.save(next), SaveResult::Inserted);
@@ -233,6 +204,21 @@ TEST_F(ReadingStoreTest, ReportsUnusableDatabasePaths) {
     EXPECT_THROW(ReadingStore((directory / "missing" / "readings.sqlite3").string()), PersistenceError);
     EXPECT_THROW(ReadingStore(""), std::invalid_argument);
     EXPECT_THROW(ReadingStore(std::string("database\0hidden", 15)), std::invalid_argument);
+}
+
+TEST_F(ReadingStoreTest, OpensDatabasesWithTheOldProcessedColumn) {
+    sqlite3* raw = nullptr;
+    ASSERT_EQ(sqlite3_open(path.c_str(), &raw), SQLITE_OK);
+    const std::unique_ptr<sqlite3, decltype(&sqlite3_close)> database{raw, sqlite3_close};
+    ASSERT_EQ(sqlite3_exec(raw,
+        "CREATE TABLE readings(node_id TEXT, session_id TEXT, seq INTEGER, datagram TEXT, "
+        "processed INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(node_id, session_id, seq));",
+        nullptr, nullptr, nullptr), SQLITE_OK);
+    ReadingStore store(path);
+    ASSERT_EQ(store.save(reading()), SaveResult::Inserted);
+    ASSERT_TRUE(store.find(reading().identity));
+    EXPECT_EQ(encode(*store.find(reading().identity)), encode(reading()));
+    EXPECT_EQ(store.save(reading()), SaveResult::Duplicate);
 }
 
 static_assert(!std::is_copy_constructible_v<ReadingStore>);

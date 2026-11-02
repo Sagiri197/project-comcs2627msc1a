@@ -1,7 +1,7 @@
 add_library(common_protocol src/protocol.cpp)
 add_library(common::protocol ALIAS common_protocol)
 target_include_directories(common_protocol PUBLIC include)
-target_compile_features(common_protocol PUBLIC cxx_std_17)
+target_compile_features(common_protocol PUBLIC cxx_std_20)
 target_link_libraries(common_protocol PRIVATE nlohmann_json::nlohmann_json)
 
 if(BUILD_TESTING)

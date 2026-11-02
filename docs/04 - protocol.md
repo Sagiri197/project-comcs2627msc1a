@@ -1,7 +1,7 @@
 # UDP protocol v1
 
 One UTF-8 JSON object per datagram, maximum 1,200 bytes including whitespace.
-The shared C++17 API is in `common/include/common/protocol.h`, provided by the
+The shared C++20 API is in `common/include/common/protocol.h`, provided by the
 `common::protocol` CMake target. `encode(Message)` returns a datagram;
 `decode(string_view)` returns a variant of `Reading`, `Ack`, or `Reject`.
 Both reject invalid inputs with `ProtocolError`, which exposes an `ErrorCode`.
@@ -17,13 +17,15 @@ the underlying `UdpSocket`.
 Blocking `receive()` returns an `AlertServer::ReceivedMessage` containing a typed `message`
 and the original `sender` endpoint, which can be passed directly to `send`.
 Protocol and socket exceptions propagate to the caller; a malformed datagram
-is consumed without closing the socket. Receiving alone has no side effects.
-`accept(reading, sender)` commits a reading to the store, then sends a QoS 1 ACK.
+is consumed without closing the socket. `receive()` validates incoming readings,
+commits them to the store, then sends a QoS 1 ACK before returning.
 Identical retries are ACKed again without inserting another record. Conflicting
-identities receive a reject without replacing the original. QoS 0 readings are
+identities receive a reject without replacing the original, then raise a
+`ProtocolError` rather than returning an accepted message. QoS 0 readings are
 stored without ACKs. Database failures throw `PersistenceError` before any reply;
 an ACK send failure leaves the committed reading available for a later retry.
-The executable receives messages continuously, accepts readings, and logs
+Incoming ACKs and rejects are returned without storage or automatic replies.
+The executable receives messages continuously and logs
 malformed datagrams or database failures without stopping the receive loop.
 
 ## Persistence
@@ -37,15 +39,11 @@ retain this database and its WAL files across restarts. A constructor path of
 
 - `save(reading)` validates and stores the canonical protocol datagram, returning
   `Inserted`, `Duplicate`, or `IdentityConflict` using `(nodeId, sessionId, seq)`.
-- `find(identity)` returns the original reading and its processing state.
-- `pending(limit)` returns unprocessed readings in identity order, capped at
-  `limit` (default 100). This is not measurement-time ordering.
-- `mark_processed(identity)` removes a reading from the pending set but retains
-  it for deduplication. Repeated calls return false.
+- `find(identity)` returns an optional reading, empty when the identity is unknown.
 
-New readings and their pending state are committed together. The daemon does not
-mark them processed yet: alert evaluation and a transactional MQTT outbox are
-not implemented. Do not mark work processed before its effects are durable.
+Readings are retained for restart recovery and deduplication. Processing queues,
+alert evaluation and an MQTT outbox are not implemented. Existing databases with
+the previous `processed` column remain compatible; that column is ignored.
 Use each store instance from one application thread; independent connections
 share the same database. Parent directories must already exist. Durability
 depends on the filesystem and storage honoring SQLite's synchronization calls.

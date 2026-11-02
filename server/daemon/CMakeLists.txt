@@ -17,7 +17,8 @@ target_link_libraries(alert_server PRIVATE
 
 if(BUILD_TESTING)
     add_executable(alert_server_tests tests/alert_server_test.cpp)
-    target_link_libraries(alert_server_tests PRIVATE alert_server_core SQLite::SQLite3 GTest::gtest_main)
+    target_link_libraries(alert_server_tests PRIVATE
+        alert_server_core SQLite::SQLite3 nlohmann_json::nlohmann_json GTest::gtest_main)
     include(GoogleTest)
     gtest_discover_tests(alert_server_tests NO_PRETTY_VALUES PROPERTIES TIMEOUT 5)
 endif()

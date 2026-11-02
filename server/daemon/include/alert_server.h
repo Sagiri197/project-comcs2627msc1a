@@ -13,10 +13,8 @@ public:
 
     explicit AlertServer(ReadingStore& store, const UdpEndpoint& endpoint = {"0.0.0.0", 8080});
 
-    ReceivedMessage receive() const;
+    ReceivedMessage receive();
     void send(const common::protocol::Message& message, const UdpEndpoint& destination) const;
-    ReadingStore::SaveResult accept(const common::protocol::Reading& reading,
-                                    const UdpEndpoint& sender);
 
 private:
     UdpSocket m_socket;

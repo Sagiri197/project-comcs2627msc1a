@@ -1,6 +1,7 @@
 #include "alert_server.h"
 
 #include <gtest/gtest.h>
+#include <nlohmann/json.hpp>
 #include <sqlite3.h>
 
 #include <arpa/inet.h>
@@ -112,6 +113,15 @@ TEST_P(AlertServerMessageTest, ReceivesTypedMessagesWithSenderEndpoint) {
     EXPECT_EQ(encode(received.message), encode(GetParam()));
     EXPECT_EQ(received.sender.address, peer_endpoint.address);
     EXPECT_EQ(received.sender.port, peer_endpoint.port);
+    if (const auto* original = std::get_if<Reading>(&GetParam())) {
+        ASSERT_TRUE(store.find(original->identity));
+        EXPECT_EQ(encode(*store.find(original->identity)), encode(*original));
+        if (original->qos == Qos::AtLeastOnce) {
+            EXPECT_EQ(encode(decode(receive_wire())), encode(Ack{original->identity}));
+        }
+    } else {
+        EXPECT_FALSE(store.find(identity()));
+    }
     expect_no_reply();
 }
 
@@ -121,11 +131,12 @@ INSTANTIATE_TEST_SUITE_P(MessageKinds, AlertServerMessageTest,
 TEST_F(AlertServerTest, RepliesToTheReceivedEndpoint) {
     send_wire(encode(reading()));
     const auto received = server.receive();
-    server.send(Ack{std::get<Reading>(received.message).identity}, received.sender);
+    EXPECT_EQ(received.sender.port, peer_endpoint.port);
     const auto ack = std::get<Ack>(decode(receive_wire()));
     EXPECT_EQ(ack.identity.node_id, identity().node_id);
     EXPECT_EQ(ack.identity.session_id, identity().session_id);
     EXPECT_EQ(ack.identity.seq, identity().seq);
+    expect_no_reply();
 }
 
 TEST_F(AlertServerTest, PropagatesParseErrorsAndContinuesReceiving) {
@@ -207,8 +218,6 @@ TEST_F(AlertServerTest, PreservesSeparateClientEndpoints) {
     EXPECT_EQ(std::get<Reading>(from_peer.message).identity.node_id, "esp32-a");
     EXPECT_EQ(std::get<Reading>(from_second.message).identity.node_id, "esp32-b");
 
-    server.send(Ack{std::get<Reading>(first.message).identity}, first.sender);
-    server.send(Ack{std::get<Reading>(second.message).identity}, second.sender);
     EXPECT_EQ(std::get<Ack>(decode(receive_wire())).identity.node_id, "esp32-a");
     EXPECT_EQ(std::get<Ack>(decode(second_client.recv().data)).identity.node_id, "esp32-b");
 }
@@ -227,65 +236,65 @@ TEST_F(AlertServerTest, PersistsReadingBeforeAcknowledgement) {
     send_wire(encode(reading()));
     const auto received = server.receive();
     const auto& original = std::get<Reading>(received.message);
-    EXPECT_EQ(server.accept(original, received.sender), ReadingStore::SaveResult::Inserted);
     const auto ack = std::get<Ack>(decode(receive_wire()));
     ASSERT_TRUE(store.find(ack.identity));
-    EXPECT_EQ(encode(store.find(ack.identity)->reading), encode(original));
-    EXPECT_FALSE(store.find(ack.identity)->processed);
+    EXPECT_EQ(encode(*store.find(ack.identity)), encode(original));
 }
 
-TEST_F(AlertServerTest, ReacknowledgesRetriesWithoutDuplicatingPendingWork) {
-    EXPECT_EQ(server.accept(reading(), peer_endpoint), ReadingStore::SaveResult::Inserted);
+TEST_F(AlertServerTest, ReacknowledgesRetriesWithoutDuplicatingReadings) {
+    send_wire(encode(reading()));
+    server.receive();
     EXPECT_TRUE(std::holds_alternative<Ack>(decode(receive_wire())));
-    EXPECT_EQ(server.accept(reading(), peer_endpoint), ReadingStore::SaveResult::Duplicate);
+    send_wire(encode(reading()));
+    server.receive();
     EXPECT_TRUE(std::holds_alternative<Ack>(decode(receive_wire())));
-    EXPECT_EQ(store.pending().size(), 1);
+    EXPECT_EQ(store.save(reading()), ReadingStore::SaveResult::Duplicate);
+    EXPECT_TRUE(store.find(reading().identity));
 }
 
 TEST_F(AlertServerTest, ReacknowledgesReadingCommittedBeforeLostAcknowledgement) {
     ASSERT_EQ(store.save(reading()), ReadingStore::SaveResult::Inserted);
-    EXPECT_EQ(server.accept(reading(), peer_endpoint), ReadingStore::SaveResult::Duplicate);
+    send_wire(encode(reading()));
+    server.receive();
     EXPECT_EQ(std::get<Ack>(decode(receive_wire())).identity.seq, reading().identity.seq);
-    EXPECT_EQ(store.pending().size(), 1);
-}
-
-TEST_F(AlertServerTest, FailedAcknowledgementSendKeepsCommittedReadingForRetry) {
-    EXPECT_THROW(server.accept(reading(), {"invalid-address", 12345}), std::invalid_argument);
-    ASSERT_TRUE(store.find(reading().identity));
-    expect_no_reply();
-    EXPECT_EQ(server.accept(reading(), peer_endpoint), ReadingStore::SaveResult::Duplicate);
-    EXPECT_TRUE(std::holds_alternative<Ack>(decode(receive_wire())));
-    EXPECT_EQ(store.pending().size(), 1);
+    EXPECT_TRUE(store.find(reading().identity));
 }
 
 TEST_F(AlertServerTest, BestEffortPersistsWithoutAcknowledgement) {
     const auto original = reading(Qos::BestEffort);
-    EXPECT_EQ(server.accept(original, peer_endpoint), ReadingStore::SaveResult::Inserted);
+    send_wire(encode(original));
+    server.receive();
     expect_no_reply();
     ASSERT_TRUE(store.find(original.identity));
-    EXPECT_EQ(encode(store.find(original.identity)->reading), encode(original));
-    EXPECT_EQ(server.accept(original, peer_endpoint), ReadingStore::SaveResult::Duplicate);
+    EXPECT_EQ(encode(*store.find(original.identity)), encode(original));
+    send_wire(encode(original));
+    server.receive();
+    EXPECT_EQ(store.save(original), ReadingStore::SaveResult::Duplicate);
     expect_no_reply();
-    EXPECT_EQ(store.pending().size(), 1);
 }
 
 TEST_F(AlertServerTest, RejectsConflictsWithoutOverwritingAcceptedReading) {
     ASSERT_EQ(store.save(reading()), ReadingStore::SaveResult::Inserted);
     auto conflict = reading();
     conflict.payload.temperature += 1;
-    EXPECT_EQ(server.accept(conflict, peer_endpoint), ReadingStore::SaveResult::IdentityConflict);
+    send_wire(encode(conflict));
+    EXPECT_THROW(server.receive(), ProtocolError);
     const auto rejection = std::get<Reject>(decode(receive_wire()));
     EXPECT_EQ(rejection.code, RejectCode::IdentityConflict);
     EXPECT_EQ(rejection.identity.seq, conflict.identity.seq);
-    EXPECT_EQ(encode(store.find(conflict.identity)->reading), encode(reading()));
+    EXPECT_EQ(encode(*store.find(conflict.identity)), encode(reading()));
     expect_no_reply();
+    send_wire(encode(reading()));
+    EXPECT_NO_THROW(server.receive());
+    EXPECT_TRUE(std::holds_alternative<Ack>(decode(receive_wire())));
 }
 
 TEST_F(AlertServerTest, InvalidReadingsAreNeitherStoredNorAcknowledged) {
-    auto invalid = reading();
-    invalid.payload.relative_humidity = 56;
-    EXPECT_THROW(server.accept(invalid, peer_endpoint), ProtocolError);
-    EXPECT_TRUE(store.pending().empty());
+    auto document = nlohmann::json::parse(encode(reading()));
+    document["payload"]["relativeHumidity"] = 56;
+    send_wire(document.dump());
+    EXPECT_THROW(server.receive(), ProtocolError);
+    EXPECT_FALSE(store.find(identity()));
     expect_no_reply();
 }
 
@@ -301,15 +310,19 @@ TEST_F(AlertServerTest, DatabaseFailureSendsNoAcknowledgementAndAllowsRetry) {
     const auto path = (std::filesystem::path(created) / "readings.sqlite3").string();
     ReadingStore disk_store(path);
     AlertServer disk_server(disk_store, {"127.0.0.1", 0});
+    disk_server.send(Ack{identity()}, peer_endpoint);
+    ASSERT_FALSE(receive_wire().empty());
     sqlite3* raw = nullptr;
     ASSERT_EQ(sqlite3_open(path.c_str(), &raw), SQLITE_OK);
     const std::unique_ptr<sqlite3, decltype(&sqlite3_close)> blocker{raw, sqlite3_close};
     ASSERT_EQ(sqlite3_exec(raw, "BEGIN IMMEDIATE;", nullptr, nullptr, nullptr), SQLITE_OK);
-    EXPECT_THROW(disk_server.accept(reading(), peer_endpoint), PersistenceError);
+    send_wire(encode(reading()));
+    EXPECT_THROW(disk_server.receive(), PersistenceError);
     expect_no_reply();
     EXPECT_FALSE(disk_store.find(reading().identity));
     ASSERT_EQ(sqlite3_exec(raw, "ROLLBACK;", nullptr, nullptr, nullptr), SQLITE_OK);
-    EXPECT_EQ(disk_server.accept(reading(), peer_endpoint), ReadingStore::SaveResult::Inserted);
+    send_wire(encode(reading()));
+    EXPECT_NO_THROW(disk_server.receive());
     EXPECT_TRUE(std::holds_alternative<Ack>(decode(receive_wire())));
     ReadingStore observer(path);
     EXPECT_TRUE(observer.find(reading().identity));
