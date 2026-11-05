@@ -1,6 +1,6 @@
-#include "common/protocol.h"
+#include "protocol.h"
 
-#include <nlohmann/json.hpp>
+#include "nlohmann/json.hpp"
 
 #include <array>
 #include <chrono>

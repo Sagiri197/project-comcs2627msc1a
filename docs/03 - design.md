@@ -14,11 +14,9 @@ flowchart LR
 
     subgraph Backend["Alert Backend"]
         UDP["UDP server"]
-        WS["API"]
     end
 
     NR["Command Centre (Node-red)"]
-    UI["UI"]
 
     A -- "MQTT" --> BROKER
     B -- "MQTT" --> BROKER
@@ -26,8 +24,6 @@ flowchart LR
     B -- "UDP" --> UDP
 
     UDP -- "Store alerts" --> LOG
-    UDP -- "Stream alerts" --> WS
     UDP -- "MQTT" --> BROKER
     BROKER -- "MQTT" --> NR
-    WS -- "WebSocket" --> UI
 ```

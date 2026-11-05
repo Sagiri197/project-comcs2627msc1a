@@ -1,4 +1,5 @@
-#include "common/protocol.h"
+#ifndef ARDUINO
+#include "protocol.h"
 
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
@@ -350,3 +351,4 @@ TEST(Protocol, EnforcesEncodedDatagramSizeAfterJsonEscaping) {
 }
 
 }
+#endif

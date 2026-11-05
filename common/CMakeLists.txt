@@ -1,11 +1,15 @@
-add_library(common_protocol src/protocol.cpp)
+add_library(nlohmann_json INTERFACE)
+add_library(nlohmann_json::nlohmann_json ALIAS nlohmann_json)
+target_include_directories(nlohmann_json INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}")
+
+add_library(common_protocol protocol.cpp)
 add_library(common::protocol ALIAS common_protocol)
-target_include_directories(common_protocol PUBLIC include)
+target_include_directories(common_protocol PUBLIC . ..)
 target_compile_features(common_protocol PUBLIC cxx_std_20)
 target_link_libraries(common_protocol PRIVATE nlohmann_json::nlohmann_json)
 
 if(BUILD_TESTING)
-    add_executable(protocol_tests tests/protocol_test.cpp)
+    add_executable(protocol_tests protocol_test.cpp)
     target_link_libraries(protocol_tests PRIVATE common::protocol nlohmann_json::nlohmann_json GTest::gtest_main)
     include(GoogleTest)
     gtest_discover_tests(protocol_tests PROPERTIES TIMEOUT 5)

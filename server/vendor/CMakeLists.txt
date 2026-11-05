@@ -1,7 +1,3 @@
-set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
-set(JSON_Install OFF CACHE BOOL "" FORCE)
-add_subdirectory(json EXCLUDE_FROM_ALL)
-
 find_package(Threads REQUIRED)
 add_library(sqlite3 STATIC sqlite/sqlite3.c)
 target_include_directories(sqlite3 PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/sqlite")
