@@ -51,6 +51,14 @@ up_ap() {
         printf 'address=/%s/%s\n' "$AP_DNS_NAME" "$AP_ADDRESS"
         # Advertise the Pi as NTP server (DHCP option 42) for clients that use it.
         printf 'dhcp-option=option:ntp-server,%s\n' "$AP_ADDRESS"
+        # Answer the public NTP host names (and their subdomains, e.g. 0.pool.ntp.org) with
+        # the Pi, so ESP32 code using the usual defaults syncs without Internet.
+        # The Pi's own chrony resolves through its uplink, not this dnsmasq, so no loop.
+        if [[ "$NTP_SERVER" == yes ]]; then
+            for name in $NTP_HOSTNAMES; do
+                printf 'address=/%s/%s\n' "$name" "$AP_ADDRESS"
+            done
+        fi
         # Fixed lease + DNS name for the Command Centre, so the broker address never changes.
         if [[ -n "$COMMAND_CENTRE_MAC" ]]; then
             printf 'dhcp-host=%s,%s\n' "$COMMAND_CENTRE_MAC" "$COMMAND_CENTRE_ADDRESS"
@@ -100,7 +108,7 @@ up_ntp() {
     cat > /etc/chrony/conf.d/comcs.conf <<EOF
 # Written by server/network-up.sh - NTP for the cell's access point.
 allow $subnet
-local stratum $NTP_LOCAL_STRATUM orphan
+local stratum $NTP_LOCAL_STRATUM
 EOF
     systemctl enable --now chrony >/dev/null 2>&1 || true
     systemctl restart chrony

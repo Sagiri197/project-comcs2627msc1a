@@ -67,7 +67,9 @@ In `nodes/configs/esp32_00X.h`, set `wifi_ssid` and `wifi_password` to the AP's 
 
 In `ap` mode the Pi is the cell's NTP server (chrony, `comcs.lan` / `192.168.50.1`, UDP 123),
 and it is also advertised by DHCP (option 42). ESP32s sync from it with
-`configTime(0, 0, "comcs.lan")`, with or without Internet.
+`configTime(0, 0, "comcs.lan")`, with or without Internet. Public NTP names such as
+`pool.ntp.org` or `time.google.com` (`NTP_HOSTNAMES` in `pi.env`) also resolve to the Pi for
+AP clients, so code using those defaults works too.
 
 - **With an uplink** (Ethernet): chrony syncs from the public pools and relays that time.
 - **Without an uplink**: chrony serves the Pi's own clock, so make sure it is right. The Pi 5
