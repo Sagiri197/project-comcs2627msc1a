@@ -1,9 +1,10 @@
 
 #include <WiFi.h>
 #include <WiFiUdp.h>
+#include <esp_system.h>
 
-#include "src/common/protocol.h"
-#include "config.h"
+#include "../../common/protocol.h"
+#include "../config.h"
 
 #include <string>
 #include <variant>
@@ -18,11 +19,13 @@ uint32_t sequenceNumber = 0;
 void sendReading() {
 
     if (sessionId.empty()) {
-        sessionId = std::string("urn:ngsi-ld:Session:1");
+        sessionId = std::string("boot-") + std::to_string(esp_random());
         return;
     }
 
     sequenceNumber++;
+
+    Serial.write(node::config.node_id);
 
     Identity identity {
         node::config.node_id,
