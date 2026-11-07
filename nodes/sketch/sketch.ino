@@ -1,20 +1,37 @@
 
 #include <WiFi.h>
 #include <WiFiUdp.h>
+#include <DHT.h>
 #include <esp_system.h>
 
 #include "../../common/protocol.h"
 #include "../config.h"
 
 #include <string>
+#include <ctime>
 #include <variant>
 
 using namespace common::protocol;
 
 WiFiUDP udp;
+DHT dht(node::config.dht_pin, DHT11);
 
 std::string sessionId;
 uint32_t sequenceNumber = 0;
+bool timeSynchronized = false;
+
+std::string currentTimestamp() {
+    struct tm timeinfo{};
+    if (!getLocalTime(&timeinfo, 1000)) {
+        return {};
+    }
+
+    char timestamp[21]{};
+    if (strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%SZ", &timeinfo) == 0) {
+        return {};
+    }
+    return timestamp;
+}
 
 void sendReading() {
 
@@ -25,7 +42,22 @@ void sendReading() {
 
     sequenceNumber++;
 
-    Serial.write(node::config.node_id);
+    const float humidity = dht.readHumidity();
+    const float temperature = dht.readTemperature();
+    const std::string timestamp = currentTimestamp();
+
+    if (isnan(humidity) || isnan(temperature)) {
+        Serial.println("Could not read DHT11 sensor");
+        sequenceNumber--;
+        return;
+    }
+    if (timestamp.empty()) {
+        Serial.println("Could not get synchronized timestamp");
+        sequenceNumber--;
+        return;
+    }
+
+    Serial.print(node::config.node_id);
 
     Identity identity {
         node::config.node_id,
@@ -35,21 +67,21 @@ void sendReading() {
 
     WeatherObserved weather {
         std::string("urn:ngsi-ld:WeatherObserved:") + node::config.node_id,
-        node::config.sample_timestamp,
+        timestamp,
         {
             node::config.longitude,
             node::config.latitude
         },
         std::string("urn:ngsi-ld:Device:") + node::config.node_id,
-        node::config.sample_temperature,
-        node::config.sample_relative_humidity
+        temperature,
+        humidity / 100.0
     };
 
     Reading reading {
         identity,
         node::config.qos,
         weather,
-        node::config.time_synchronized
+        timeSynchronized
     };
 
     Message message = reading;
@@ -191,6 +223,13 @@ void setup() {
     }
 
     Serial.println("\nWiFi connected!");
+
+    configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+    struct tm timeinfo{};
+    timeSynchronized = getLocalTime(&timeinfo, node::config.time_sync_threshold_ms);
+    Serial.println(timeSynchronized ? "Time synchronized!" : "Time synchronization failed");
+
+    dht.begin();
 
     Serial.print("ESP32 IP: ");
     Serial.println(WiFi.localIP());
