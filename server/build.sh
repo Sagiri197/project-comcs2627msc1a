@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Build the alert server on the Pi, install it as /usr/local/bin/comcs-alert-server and
-# restart the service if it is running. Run as your normal user (it uses sudo to install).
+# restart the service if it is running. Run as the user who owns the checkout (uses sudo to
+# install), or as root when root owns the checkout.
 #
 # Usage: server/build.sh [--test] [--no-install]
 #   --test        also build and run the unit tests (slower)
@@ -17,7 +18,14 @@ for arg in "$@"; do
     esac
 done
 
-[[ $EUID -ne 0 ]] || die "run as your normal user, not root (the build dir must stay user-owned)"
+# Run as the user who owns the checkout, so the build dir and submodules stay owned by them.
+owner="$(stat -c %U "$REPO_DIR")"
+if [[ $EUID -eq 0 && "$owner" != root ]]; then
+    die "the checkout belongs to $owner: run as $owner, not root (the build dir must stay $owner-owned)"
+fi
+
+# sudo only when not already root (a root shell may not have sudo installed).
+as_root() { if [[ $EUID -eq 0 ]]; then "$@"; else sudo "$@"; fi; }
 
 build_dir="$REPO_DIR/server/build"
 
@@ -37,9 +45,9 @@ fi
 
 if (( install )); then
     log "Installing $SERVER_BIN"
-    sudo install -m 0755 "$build_dir/bin/alert_server" "$SERVER_BIN"
+    as_root install -m 0755 "$build_dir/bin/alert_server" "$SERVER_BIN"
     if systemctl is-active --quiet "$SERVICE"; then
         log "Restarting $SERVICE"
-        sudo systemctl restart "$SERVICE"
+        as_root systemctl restart "$SERVICE"
     fi
 fi

@@ -3,12 +3,12 @@
 # build tools, Docker, the alert server binary and its systemd unit.
 # Re-running it is safe.
 #
-# Usage: server/install.sh        (asks for sudo)
+# Usage: server/install.sh        (asks for sudo; can also be run directly as root)
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 require_root "$@"
 
+# The user who owns the checkout builds the server; root is fine (e.g. a checkout in /root).
 user="$(invoking_user)"
-[[ "$user" != root ]] || die "run from a normal user's checkout of the repo, not as root"
 
 [[ "$(uname -m)" == aarch64 ]] || warn "expected a 64-bit OS (aarch64), got $(uname -m)"
 
@@ -22,7 +22,7 @@ if ! command -v docker >/dev/null || ! docker compose version >/dev/null 2>&1; t
     curl -fsSL https://get.docker.com | sh
 fi
 systemctl enable --now docker
-if ! id -nG "$user" | grep -qw docker; then
+if [[ "$user" != root ]] && ! id -nG "$user" | grep -qw docker; then
     usermod -aG docker "$user"
     warn "added $user to the docker group: log out and back in to use docker without sudo"
 fi
@@ -37,7 +37,11 @@ fi
 chown -R 1000:1000 "$COMPOSE_DIR/nodered"
 
 log "Building the alert server as $user"
-sudo -u "$user" bash "$PI_DIR/build.sh" --no-install
+if [[ "$user" == root ]]; then
+    bash "$PI_DIR/build.sh" --no-install
+else
+    sudo -u "$user" bash "$PI_DIR/build.sh" --no-install
+fi
 install -m 0755 "$REPO_DIR/server/build/bin/alert_server" "$SERVER_BIN"
 
 log "Installing the $SERVICE systemd unit"
