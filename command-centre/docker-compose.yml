@@ -1,0 +1,34 @@
+# Command Centre stack: MQTT broker + Node-RED dashboard.
+#   docker compose up -d --build
+# Editor:    http://localhost:1880
+# Dashboard: http://localhost:1880/dashboard
+# Broker:    <host IP>:1883
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.0.22
+    container_name: comcs-mosquitto
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - mosquitto-data:/mosquitto/data
+    restart: unless-stopped
+
+  nodered:
+    build: ./nodered
+    container_name: comcs-nodered
+    ports:
+      - "1880:1880"
+    environment:
+      - TZ=Europe/Lisbon
+      - MQTT_HOST=mosquitto
+      - MQTT_PORT=1883
+    volumes:
+      - ./nodered:/data
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
+
+volumes:
+  mosquitto-data:

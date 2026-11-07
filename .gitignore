@@ -6,3 +6,12 @@ server/logs/
 *.sqlite3
 *.sqlite3-wal
 *.sqlite3-shm
+# Node-RED runtime files (command-centre/nodered is mounted as /data)
+command-centre/nodered/.config.*.json
+command-centre/nodered/.flows*.backup
+command-centre/nodered/flows_cred.json
+command-centre/nodered/package.json
+command-centre/nodered/package-lock.json
+command-centre/nodered/node_modules/
+command-centre/nodered/lib/
+command-centre/nodered/context/
