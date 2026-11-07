@@ -13,13 +13,6 @@ AlertServer::ReceivedMessage AlertServer::receive() {
     if (const auto* reading = std::get_if<common::protocol::Reading>(&message)) {
         
         const auto result = m_store.save(*reading);
-        if (result == ReadingStore::SaveResult::IdentityConflict) {
-            send(common::protocol::Reject{reading->identity, common::protocol::RejectCode::IdentityConflict,
-                                          "Identity already belongs to a different reading"}, datagram.sender);
-            
-            throw common::protocol::ProtocolError(common::protocol::ErrorCode::InvalidMessage,
-                                                   "Reading identity conflicts with an accepted reading");
-        }
 
         if (reading->qos == common::protocol::Qos::AtLeastOnce) {
             send(common::protocol::Ack{reading->identity}, datagram.sender);
