@@ -8,7 +8,6 @@ server/logs/
 *.sqlite3-wal
 *.sqlite3-shm
 *.sqlite3-shmbuild
-build/
 server/Testing/
 
 # Nodes
