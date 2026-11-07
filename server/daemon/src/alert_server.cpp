@@ -2,8 +2,8 @@
 
 #include <utility>
 
-AlertServer::AlertServer(ReadingStore& store, const UdpEndpoint& endpoint)
-    : m_socket(endpoint), m_store(store) {}
+AlertServer::AlertServer(ReadingStore& store, AlertLogic& logic, const UdpEndpoint& endpoint)
+    : m_socket(endpoint), m_store(store), m_logic(logic) {}
 
 AlertServer::ReceivedMessage AlertServer::receive() {
 
@@ -12,6 +12,10 @@ AlertServer::ReceivedMessage AlertServer::receive() {
 
     if (const auto* reading = std::get_if<common::protocol::Reading>(&message)) {
         
+        // Process with AlertLogic (compares with last reading from DB, logs alerts)
+        m_logic.processReading(*reading);
+        
+        // Save the reading to database
         const auto result = m_store.save(*reading);
 
         if (reading->qos == common::protocol::Qos::AtLeastOnce) {
@@ -26,3 +30,4 @@ void AlertServer::send(const common::protocol::Message& message,
                        const UdpEndpoint& destination) const {
     m_socket.send(common::protocol::encode(message), destination);
 }
+

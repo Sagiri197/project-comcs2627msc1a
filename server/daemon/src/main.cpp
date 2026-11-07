@@ -1,4 +1,5 @@
 #include "alert_server.h"
+#include "application.h"
 
 #include "logging.h"
 
@@ -9,15 +10,16 @@ int main() {
 
     try {
         ReadingStore store("readings.sqlite3");
-        AlertServer server(store, {"0.0.0.0", 8080});
+        AlertLogic logic(store);
+        AlertServer server(store, logic, {"0.0.0.0", 8080});
         spdlog::info("UDP server listening on port 8080");
 
         while (true) {
             try {
-                
                 const auto received = server.receive();
+                
                 std::visit([&](const auto& message) {
-                    spdlog::info("Client {}:{}: node={} session={} seq={}",
+                    spdlog::debug("Received from {}:{}: node={} session={} seq={}",
                                  received.sender.address, received.sender.port,
                                  message.identity.node_id, message.identity.session_id,
                                  message.identity.seq);
