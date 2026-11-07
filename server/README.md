@@ -1,20 +1,23 @@
 # Raspberry Pi 5 server
 
-Runs the whole back end of the cell on a Raspberry Pi 5:
+Runs the Alert Server side of the cell on a Raspberry Pi 5 (see
+[docs/system.png](../docs/system.png)):
 
-- **Network**: by default the Pi is a 2.4 GHz Wi-Fi access point with DHCP and DNS, and the
-  ESP32s connect to it directly. It can also join an existing Wi-Fi network instead.
+- **Network**: the Pi is the cell's 2.4 GHz Wi-Fi access point (`comcs-cell1`) with DHCP, DNS
+  and NTP. The ESP32s and the Command Centre connect to it. It can also join an existing
+  Wi-Fi network instead.
 - **Alert server**: UDP 8080, built natively and run by systemd as `comcs-alert-server`.
-- **MQTT broker + Node-RED**: the `command-centre/` Docker stack. By default this runs on a
-  separate Command Centre machine that joins the Pi's access point (see below). Set
-  `RUN_COMMAND_CENTRE_ON_PI=yes` in `pi.env` to run it on the Pi instead.
+  It publishes alerts to the Command Centre's MQTT broker.
+
+The Command Centre (MQTT broker + Node-RED) is a separate machine on the AP, set up from
+[command-centre/](../command-centre/README.md). The Pi only gives it a fixed address.
 
 ```
              Wi-Fi AP "comcs-cell1"  (192.168.50.0/24), hosted by the Pi
 ESP32 A ─┐
-ESP32 B ─┼──► Alert Server: Raspberry Pi 5   192.168.50.1  comcs.lan     UDP 8080
+ESP32 B ─┼──► Alert Server: Raspberry Pi 5   192.168.50.1  comcs.lan     UDP 8080, NTP 123
 ESP32 C ─┘
-   │  └────► Command Centre machine          192.168.50.2  cc.comcs.lan  MQTT 1883, Node-RED 1880
+   │  └────► Command Centre machine          192.168.50.2  cc.comcs.lan  MQTT 1883
    └───────────────────────────────────────────▲  (ESP32s and the alert server publish to it)
 ```
 
@@ -23,14 +26,15 @@ Requires **Raspberry Pi OS Bookworm 64-bit** or newer, which uses NetworkManager
 ```
 server/                         (alongside the CMake sources: daemon/, udp/, persistency/, vendor/)
 ├── pi.env                      settings (SSID, password, addresses, mode)
-├── install.sh                  one-time setup: packages, build, systemd unit (+ Docker if RUN_COMMAND_CENTRE_ON_PI=yes)
+├── install.sh                  one-time setup: packages, build, systemd unit
 ├── build.sh                    rebuild + reinstall the alert server (after git pull)
-├── up.sh / down.sh             whole cell up / down
-├── network-up.sh / network-down.sh   only the network
+├── up.sh / down.sh             network + alert server up / down
 ├── status.sh                   state + endpoints to give the ESP32s
 ├── monitor.sh                  live stats: IP, connected devices, UDP readings
-├── set-time.sh                 set the clock by hand (served by NTP when offline)
-└── comcs-alert-server.service  systemd unit
+├── comcs-alert-server.service  systemd unit
+└── network/
+    ├── up.sh / down.sh         only the network: AP or client Wi-Fi, DHCP/DNS, NTP
+    └── set-time.sh             set the clock by hand (served by NTP when offline)
 ```
 
 ## Setup
@@ -38,13 +42,13 @@ server/                         (alongside the CMake sources: daemon/, udp/, per
 ```bash
 git clone --recursive <repo-url> ~/comcs && cd ~/comcs
 nano server/pi.env           # or put overrides in server/pi.env.local (git-ignored)
-server/install.sh            # once (C++ build; also installs Docker if RUN_COMMAND_CENTRE_ON_PI=yes)
-server/up.sh                 # network + broker + Node-RED + alert server
+server/install.sh            # once (packages + C++ build)
+server/up.sh                 # network (AP, DHCP/DNS, NTP) + alert server
 ```
 
-Every component is set to start at boot: the NetworkManager profile autoconnects, the containers use
-`restart: unless-stopped`, and the systemd unit is enabled. After a reboot the cell comes back
-by itself. Run `server/status.sh` to check it.
+Everything is set to start at boot: the NetworkManager profile autoconnects, and chrony and the
+systemd unit are enabled. After a reboot the Pi comes back by itself. Run `server/status.sh`
+to check it.
 
 > **Over SSH:** switching `wlan0` to AP or client mode drops an SSH session that came in over
 > `wlan0`. Use Ethernet or a keyboard for the first `up.sh`. Afterwards you can SSH in through
@@ -75,42 +79,35 @@ AP clients, so code using those defaults works too.
 - **Without an uplink**: chrony serves the Pi's own clock, so make sure it is right. The Pi 5
   keeps time across reboots only with an RTC battery. Otherwise, set the clock after boot,
   for example by pushing the laptop's time:
-  `ssh <user>@comcs.lan "sudo ~/comcs/server/set-time.sh @<unix-seconds>"`
-  (the PowerShell form is in [set-time.sh](set-time.sh)).
+  `ssh <user>@comcs.lan "sudo ~/comcs/server/network/set-time.sh @<unix-seconds>"`
+  (the PowerShell form is in [network/set-time.sh](network/set-time.sh)).
 
 Check it with `chronyc tracking` (time source) and `sudo chronyc clients` (who is asking).
 `server/monitor.sh` shows both. Set `NTP_SERVER=no` in `pi.env` to turn it off.
 
-## Connecting the Command Centre
+## Command Centre address
 
-The Command Centre machine joins the Pi's Wi-Fi like any other client. It gets a fixed address
-so the ESP32s and the alert server can always reach the broker:
+The Command Centre joins `comcs-cell1` like any other client. The Pi gives it a fixed address
+so the ESP32s and the alert server can always reach its broker:
 
-1. On the Command Centre machine, find the MAC address of its Wi-Fi adapter
-   (Windows: `getmac /v`, Linux: `ip link`).
-2. On the Pi, set `COMMAND_CENTRE_MAC=<that MAC>` in `pi.env.local` and run `server/network-up.sh`.
-   Its DHCP server then always gives that machine `192.168.50.2`, and `cc.comcs.lan`
-   resolves to it.
-3. Connect the Command Centre machine to `comcs-cell1` and start the stack:
-   `cd command-centre && docker compose up -d --build`.
-4. Windows only: set the `comcs-cell1` connection to **Private** and allow inbound TCP 1883
-   (and 1880 for the dashboard) in Windows Firewall. If you use Docker inside WSL, also follow
-   the WSL steps in [command-centre/README.md](../command-centre/README.md).
-5. On the Pi, `server/status.sh` should show the Command Centre and broker port `up`.
+1. Set `COMMAND_CENTRE_MAC` in `pi.env` (or `pi.env.local`) to the MAC of the Command Centre's
+   Wi-Fi adapter (Windows: `getmac /v`, Linux: `ip link`; either format works).
+2. Run `server/network/up.sh`. That machine then always gets `192.168.50.2`, and
+   `cc.comcs.lan` resolves to it.
+3. `server/status.sh` shows whether the Command Centre and its broker port are reachable.
 
-ESP32s and the alert server use `cc.comcs.lan:1883` as the MQTT broker. A machine connected to
-the AP doesn't get Internet unless the Pi has an Ethernet uplink.
+ESP32s and the alert server use `cc.comcs.lan:1883` as the MQTT broker. Setting up the broker
+itself is covered in [command-centre/README.md](../command-centre/README.md).
 
 ## Day to day
 
 ```bash
 server/status.sh                           # what is up, client count, endpoints
 server/monitor.sh -w                       # live: IP, connected devices (MAC/IP/node), UDP readings
-journalctl -u comcs-alert-server -f    # alert server logs
-docker compose -f command-centre/docker-compose.yml logs -f
+journalctl -u comcs-alert-server -f        # alert server logs
 server/build.sh [--test]                   # after a git pull that touches server/ or common/
-server/down.sh [--keep-network]            # stop everything (and remove the AP/client profile)
-mosquitto_sub -h localhost -t 'comcs/#' -v
+server/down.sh [--keep-network]            # stop the alert server (and remove the AP/client profile)
+mosquitto_sub -h cc.comcs.lan -t 'comcs/#' -v   # watch the Command Centre's broker from the Pi
 ```
 
 The readings database is `/var/lib/comcs-alert-server/readings.sqlite3`.

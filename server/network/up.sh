@@ -5,8 +5,8 @@
 #   none   - do nothing
 # Both profiles autoconnect, so the network comes back after a reboot.
 #
-# Usage: sudo server/network-up.sh [ap|client|none]
-source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
+# Usage: sudo server/network/up.sh [ap|client|none]
+source "$(dirname "${BASH_SOURCE[0]}")/../common.sh"
 require_root "$@"
 
 mode="${1:-$WIFI_MODE}"
@@ -77,7 +77,7 @@ up_ap() {
         log "Internet from the Pi's uplink is NAT-shared to AP clients"
     else
         warn "No uplink (e.g. Ethernet): AP clients have no Internet. The Pi still serves NTP" \
-             "from its own clock; check it with 'date' (fix with server/set-time.sh)"
+             "from its own clock; check it with 'date' (fix with server/network/set-time.sh)"
     fi
 
     up_ntp
@@ -106,7 +106,7 @@ up_ntp() {
     subnet="$(subnet_of "$AP_ADDRESS" "$AP_PREFIX")"
     mkdir -p /etc/chrony/conf.d
     cat > /etc/chrony/conf.d/comcs.conf <<EOF
-# Written by server/network-up.sh - NTP for the cell's access point.
+# Written by server/network/up.sh - NTP for the cell's access point.
 allow $subnet
 local stratum $NTP_LOCAL_STRATUM
 EOF

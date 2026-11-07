@@ -4,7 +4,6 @@ set -euo pipefail
 
 PI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$PI_DIR/.." && pwd)"
-COMPOSE_DIR="$REPO_DIR/command-centre"
 
 AP_CON=comcs-ap
 CLIENT_CON=comcs-client
@@ -36,10 +35,6 @@ invoking_user() {
     else
         stat -c %U "$REPO_DIR"
     fi
-}
-
-compose() {
-    docker compose --project-directory "$COMPOSE_DIR" -f "$COMPOSE_DIR/docker-compose.yml" "$@"
 }
 
 # IPv4 address of an interface, empty if none.

@@ -1,6 +1,6 @@
 [Unit]
 Description=COMCS alert server (UDP 8080)
-After=network-online.target docker.service
+After=network-online.target
 Wants=network-online.target
 
 [Service]

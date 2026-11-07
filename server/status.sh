@@ -22,16 +22,13 @@ fi
 
 echo "Services"
 printf '  %-22s %b\n' "alert server" "$(state systemctl is-active --quiet "$SERVICE")"
-if [[ "$RUN_COMMAND_CENTRE_ON_PI" == yes ]]; then
-    printf '  %-22s %b\n' "mosquitto (docker)" "$(state test "$(docker inspect -f '{{.State.Running}}' comcs-mosquitto 2>/dev/null)" = true)"
-    printf '  %-22s %b\n' "node-red (docker)" "$(state test "$(docker inspect -f '{{.State.Running}}' comcs-nodered 2>/dev/null)" = true)"
-    cc_host="${host_ip:-<pi>}"
-elif [[ "$active_con" == "$AP_CON" && -n "$COMMAND_CENTRE_MAC" ]]; then
-    cc_host="$COMMAND_CENTRE_DNS_NAME"
-    printf '  %-22s %b\n' "command centre (AP)" "$(state ping -c1 -W1 "$COMMAND_CENTRE_ADDRESS")"
-    printf '  %-22s %b\n' "broker port $MQTT_PORT" "$(state timeout 2 bash -c "</dev/tcp/$COMMAND_CENTRE_ADDRESS/$MQTT_PORT")"
-else
-    cc_host="<command centre IP>"
+if [[ "$NTP_SERVER" == yes ]]; then
+    printf '  %-22s %b\n' "ntp (chrony)" "$(state systemctl is-active --quiet chrony)"
+fi
+# The Command Centre is another machine; only check that the alert server can reach its broker.
+if [[ "$active_con" == "$AP_CON" && -n "$COMMAND_CENTRE_MAC" ]]; then
+    printf '  %-22s %b\n' "command centre" "$(state ping -c1 -W1 "$COMMAND_CENTRE_ADDRESS")"
+    printf '  %-22s %b\n' "  broker :$MQTT_PORT" "$(state timeout 2 bash -c "</dev/tcp/$COMMAND_CENTRE_ADDRESS/$MQTT_PORT")"
 fi
 
 echo "Endpoints"
@@ -41,16 +38,10 @@ else
     printf '  %-22s %s\n' "ESP32 server_address" "${host_ip:--}"
 fi
 printf '  %-22s %s\n' "Alert server (UDP)" "${host_ip:--}:$ALERT_SERVER_UDP_PORT"
-if [[ "$active_con" == "$AP_CON" && "$NTP_SERVER" == yes ]]; then
-    printf '  %-22s %s  [chrony %b]\n' "NTP server" "$AP_DNS_NAME ($AP_ADDRESS):123" \
-        "$(state systemctl is-active --quiet chrony)"
+if [[ "$active_con" == "$AP_CON" ]]; then
+    [[ "$NTP_SERVER" == yes ]] && printf '  %-22s %s\n' "NTP server" "$AP_DNS_NAME ($AP_ADDRESS):123"
+    [[ -n "$COMMAND_CENTRE_MAC" ]] && printf '  %-22s %s\n' "MQTT broker (CC)" \
+        "$COMMAND_CENTRE_DNS_NAME:$MQTT_PORT (= $COMMAND_CENTRE_ADDRESS)"
 fi
-if [[ "$cc_host" == "$COMMAND_CENTRE_DNS_NAME" ]]; then
-    printf '  %-22s %s\n' "MQTT broker" "$cc_host:$MQTT_PORT (= $COMMAND_CENTRE_ADDRESS)"
-else
-    printf '  %-22s %s\n' "MQTT broker" "$cc_host:$MQTT_PORT"
-fi
-printf '  %-22s %s\n' "Node-RED editor" "http://$cc_host:1880"
-printf '  %-22s %s\n' "Dashboard" "http://$cc_host:1880/dashboard"
 echo
-echo "Logs: journalctl -u $SERVICE -f   |   docker compose -f $COMPOSE_DIR/docker-compose.yml logs -f"
+echo "Logs: journalctl -u $SERVICE -f   |   live stats: server/monitor.sh -w"
