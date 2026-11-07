@@ -120,3 +120,34 @@ std::optional<common::protocol::Reading> ReadingStore::find(
     }
     return std::nullopt;
 }
+
+std::optional<common::protocol::Reading> ReadingStore::getLastReading() const {
+    auto statement = prepare(m_database,
+        "SELECT node_id, session_id, seq, temperature, relative_humidity, longitude, latitude "
+        "FROM readings ORDER BY seq DESC LIMIT 1;");
+    
+    const int result = sqlite3_step(statement.get());
+    if (result != SQLITE_ROW) {
+        return std::nullopt;  // No readings yet
+    }
+    
+    const std::string node_id = reinterpret_cast<const char*>(sqlite3_column_text(statement.get(), 0));
+    const std::string session_id = reinterpret_cast<const char*>(sqlite3_column_text(statement.get(), 1));
+    const std::uint32_t seq = sqlite3_column_int(statement.get(), 2);
+    const double temperature = sqlite3_column_double(statement.get(), 3);
+    const double humidity = sqlite3_column_double(statement.get(), 4);
+    const double longitude = sqlite3_column_double(statement.get(), 5);
+    const double latitude = sqlite3_column_double(statement.get(), 6);
+    
+    common::protocol::Identity identity{node_id, session_id, seq};
+    common::protocol::WeatherObserved payload{
+        "urn:ngsi-ld:WeatherObserved:" + node_id + ":" + session_id + ":" + std::to_string(seq),
+        "2026-11-07T00:00:00Z",
+        {longitude, latitude},
+        "urn:ngsi-ld:Device:" + node_id,
+        temperature,
+        humidity
+    };
+    
+    return common::protocol::Reading{identity, common::protocol::Qos::BestEffort, payload, true};
+}

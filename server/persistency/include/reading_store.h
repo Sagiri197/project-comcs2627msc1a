@@ -29,6 +29,7 @@ public:
 
     SaveResult save(const common::protocol::Reading& reading);
     std::optional<common::protocol::Reading> find(const common::protocol::Identity& identity) const;
+    std::optional<common::protocol::Reading> getLastReading() const;
 
 private:
     sqlite3* m_database = nullptr;

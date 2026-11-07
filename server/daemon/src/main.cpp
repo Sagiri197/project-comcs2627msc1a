@@ -10,7 +10,7 @@ int main() {
 
     try {
         ReadingStore store("readings.sqlite3");
-        AlertLogic logic;
+        AlertLogic logic(store);
         AlertServer server(store, logic, {"0.0.0.0", 8080});
         spdlog::info("UDP server listening on port 8080");
 

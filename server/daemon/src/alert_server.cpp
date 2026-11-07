@@ -12,12 +12,10 @@ AlertServer::ReceivedMessage AlertServer::receive() {
 
     if (const auto* reading = std::get_if<common::protocol::Reading>(&message)) {
         
-        // Accumulate reading
-        m_logic.addReading(*reading);
+        // Process with AlertLogic (compares with last reading from DB, logs alerts)
+        m_logic.processReading(*reading);
         
-        auto accumulated = m_logic.tryProcessSequence(reading->identity.seq);
-        
-        // Save the reading
+        // Save the reading to database
         const auto result = m_store.save(*reading);
 
         if (reading->qos == common::protocol::Qos::AtLeastOnce) {
