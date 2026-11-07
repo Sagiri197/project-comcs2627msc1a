@@ -19,7 +19,7 @@ private:
 
 class ReadingStore {
 public:
-    enum class SaveResult { Inserted, Duplicate, IdentityConflict };
+    enum class SaveResult { Inserted, Duplicate };
 
     explicit ReadingStore(const std::string& path);
     ~ReadingStore();

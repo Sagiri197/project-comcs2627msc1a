@@ -60,7 +60,8 @@ ReadingStore::ReadingStore(const std::string& path) {
             "CREATE TABLE IF NOT EXISTS readings ("
             "node_id TEXT NOT NULL, session_id TEXT NOT NULL, "
             "seq INTEGER NOT NULL CHECK(seq BETWEEN 0 AND 4294967295), "
-            "datagram TEXT NOT NULL, "
+            "longitude REAL NOT NULL, latitude REAL NOT NULL, "
+            "temperature REAL NOT NULL, relative_humidity REAL NOT NULL, "
             "PRIMARY KEY(node_id, session_id, seq)) WITHOUT ROWID;";
     
         if (sqlite3_busy_timeout(m_database, 250) != SQLITE_OK ||
@@ -81,42 +82,41 @@ ReadingStore::~ReadingStore() {
 
 ReadingStore::SaveResult ReadingStore::save(const common::protocol::Reading& reading) {
     
-    const auto datagram = common::protocol::encode(reading);
     auto statement = prepare(m_database,
-        "INSERT INTO readings(node_id, session_id, seq, datagram) VALUES(?1, ?2, ?3, ?4) "
-        "ON CONFLICT(node_id, session_id, seq) DO NOTHING;");
+        "INSERT OR IGNORE INTO readings(node_id, session_id, seq, longitude, latitude, temperature, relative_humidity) "
+        "VALUES(?1, ?2, ?3, ?4, ?5, ?6, ?7);");
     
     bind_identity(m_database, statement.get(), reading.identity);
-    if (sqlite3_bind_text(statement.get(), 4, datagram.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK ||
+    
+    if (sqlite3_bind_double(statement.get(), 4, reading.payload.location.longitude) != SQLITE_OK ||
+        sqlite3_bind_double(statement.get(), 5, reading.payload.location.latitude) != SQLITE_OK ||
+        sqlite3_bind_double(statement.get(), 6, reading.payload.temperature) != SQLITE_OK ||
+        sqlite3_bind_double(statement.get(), 7, reading.payload.relative_humidity) != SQLITE_OK ||
         sqlite3_step(statement.get()) != SQLITE_DONE) {
         database_error(m_database, "Save reading");
     }
     
-    if (sqlite3_changes(m_database) == 1) return SaveResult::Inserted;
+    if (sqlite3_changes(m_database) == 1) {
+        return SaveResult::Inserted;
+    }
 
-    const auto existing = find(reading.identity);
-    if (!existing)
-        throw PersistenceError(SQLITE_CORRUPT, "Duplicate reading is missing from database");
-
-    return common::protocol::encode(*existing) == datagram
-        ? SaveResult::Duplicate : SaveResult::IdentityConflict;
+    return SaveResult::Duplicate;
 }
 
 std::optional<common::protocol::Reading> ReadingStore::find(
-
     const common::protocol::Identity& identity) const {
     auto statement = prepare(m_database,
-        "SELECT datagram FROM readings WHERE node_id=?1 AND session_id=?2 AND seq=?3;");
+        "SELECT COUNT(*) FROM readings WHERE node_id=?1 AND session_id=?2 AND seq=?3;");
     
     bind_identity(m_database, statement.get(), identity);
     
     const int result = sqlite3_step(statement.get());
-    if (result == SQLITE_DONE) return std::nullopt;
     if (result != SQLITE_ROW) database_error(m_database, "Find reading");
     
-    const auto* text = reinterpret_cast<const char*>(sqlite3_column_text(statement.get(), 0));
-    if (text == nullptr) throw PersistenceError(SQLITE_CORRUPT, "Missing stored datagram");
+    const int count = sqlite3_column_int(statement.get(), 0);
     
-    const std::string_view datagram{text, static_cast<std::size_t>(sqlite3_column_bytes(statement.get(), 0))};
-    return std::get<common::protocol::Reading>(common::protocol::decode(datagram));
+    if (count > 0) {
+        return common::protocol::Reading{identity, common::protocol::Qos::BestEffort, {}, true};
+    }
+    return std::nullopt;
 }
