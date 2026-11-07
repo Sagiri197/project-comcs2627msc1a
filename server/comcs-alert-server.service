@@ -1,0 +1,17 @@
+[Unit]
+Description=COMCS alert server (UDP 8080)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/comcs-alert-server
+# readings.sqlite3 is created in the working directory: /var/lib/comcs-alert-server
+# Logs go to the journal: journalctl -u comcs-alert-server -f
+DynamicUser=yes
+StateDirectory=comcs-alert-server
+WorkingDirectory=%S/comcs-alert-server
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
