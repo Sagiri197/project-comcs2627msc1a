@@ -44,6 +44,9 @@ up_ap() {
     # NetworkManager's dnsmasq (DHCP + DNS for shared mode) reads this directory, so the
     # ESP32s can use AP_DNS_NAME as server_address instead of a hard-coded IP.
     mkdir -p /etc/NetworkManager/dnsmasq-shared.d
+    # Accept the Windows `getmac` format (4C-5F-...): dnsmasq needs colons, and reads a
+    # leading "xx-" as an ARP hardware type.
+    COMMAND_CENTRE_MAC="$(tr 'A-F-' 'a-f:' <<< "$COMMAND_CENTRE_MAC")"
     {
         printf 'address=/%s/%s\n' "$AP_DNS_NAME" "$AP_ADDRESS"
         # Fixed lease + DNS name for the Command Centre, so the broker address never changes.
