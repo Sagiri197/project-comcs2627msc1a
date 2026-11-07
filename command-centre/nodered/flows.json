@@ -1,0 +1,1250 @@
+[
+    {
+        "id": "tab_cc",
+        "type": "tab",
+        "label": "Command Centre",
+        "disabled": false,
+        "info": "Cell 1 command centre: WeatherObserved readings from the ESP32 nodes, alerts from the UDP alert server, and component health.\n\nTopics are documented in command-centre/README.md."
+    },
+    {
+        "id": "tab_sim",
+        "type": "tab",
+        "label": "Simulator",
+        "disabled": false,
+        "info": "Publishes fake data to the broker so the dashboard can be tested without hardware. Enable the \"every 1 s\" inject node to stream readings."
+    },
+    {
+        "id": "broker",
+        "type": "mqtt-broker",
+        "name": "COMCS broker",
+        "broker": "${MQTT_HOST}",
+        "port": "${MQTT_PORT}",
+        "clientid": "comcs-command-centre",
+        "autoConnect": true,
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "15",
+        "cleansession": false,
+        "autoUnsubscribe": true,
+        "birthTopic": "comcs/cell1/command-centre/status",
+        "birthQos": "1",
+        "birthRetain": "true",
+        "birthPayload": "online",
+        "birthMsg": {},
+        "closeTopic": "comcs/cell1/command-centre/status",
+        "closeQos": "1",
+        "closeRetain": "true",
+        "closePayload": "offline",
+        "closeMsg": {},
+        "willTopic": "comcs/cell1/command-centre/status",
+        "willQos": "1",
+        "willRetain": "true",
+        "willPayload": "offline",
+        "willMsg": {},
+        "userProps": "",
+        "sessionExpiry": ""
+    },
+    {
+        "id": "ui_base",
+        "type": "ui-base",
+        "name": "COMCS",
+        "path": "/dashboard",
+        "appIcon": "",
+        "includeClientData": true,
+        "acceptsClientConfig": [
+            "ui-notification",
+            "ui-control"
+        ],
+        "showPathInSidebar": false,
+        "headerContent": "page",
+        "navigationStyle": "default",
+        "titleBarStyle": "default",
+        "showReconnectNotification": true,
+        "notificationDisplayTime": 1,
+        "showDisconnectNotification": true,
+        "allowInstall": false
+    },
+    {
+        "id": "ui_theme",
+        "type": "ui-theme",
+        "name": "COMCS theme",
+        "colors": {
+            "surface": "#1f4e79",
+            "primary": "#1f4e79",
+            "bgPage": "#eef1f5",
+            "groupBg": "#ffffff",
+            "groupOutline": "#cccccc"
+        },
+        "sizes": {
+            "density": "default",
+            "pagePadding": "12px",
+            "groupGap": "12px",
+            "groupBorderRadius": "6px",
+            "widgetGap": "12px"
+        }
+    },
+    {
+        "id": "ui_page",
+        "type": "ui-page",
+        "name": "Cell 1",
+        "ui": "ui_base",
+        "path": "/cell1",
+        "icon": "thermometer",
+        "layout": "grid",
+        "theme": "ui_theme",
+        "breakpoints": [
+            {
+                "name": "Default",
+                "px": "0",
+                "cols": "3"
+            },
+            {
+                "name": "Tablet",
+                "px": "576",
+                "cols": "6"
+            },
+            {
+                "name": "Small Desktop",
+                "px": "768",
+                "cols": "9"
+            },
+            {
+                "name": "Desktop",
+                "px": "1024",
+                "cols": "12"
+            }
+        ],
+        "order": 1,
+        "className": "",
+        "visible": "true",
+        "disabled": "false"
+    },
+    {
+        "id": "g_avg",
+        "type": "ui-group",
+        "name": "Cell average (live)",
+        "page": "ui_page",
+        "width": "6",
+        "height": "1",
+        "order": 1,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false",
+        "groupType": "default"
+    },
+    {
+        "id": "g_alert",
+        "type": "ui-group",
+        "name": "Alerts",
+        "page": "ui_page",
+        "width": "6",
+        "height": "1",
+        "order": 2,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false",
+        "groupType": "default"
+    },
+    {
+        "id": "g_hist",
+        "type": "ui-group",
+        "name": "History",
+        "page": "ui_page",
+        "width": "12",
+        "height": "1",
+        "order": 3,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false",
+        "groupType": "default"
+    },
+    {
+        "id": "g_health",
+        "type": "ui-group",
+        "name": "System health",
+        "page": "ui_page",
+        "width": "12",
+        "height": "1",
+        "order": 4,
+        "showTitle": true,
+        "className": "",
+        "visible": "true",
+        "disabled": "false",
+        "groupType": "default"
+    },
+    {
+        "id": "c_read",
+        "type": "comment",
+        "z": "tab_cc",
+        "name": "Readings: comcs/cell1/<nodeId>/weather (Smart Data Model WeatherObserved)",
+        "info": "",
+        "x": 250,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "in_weather",
+        "type": "mqtt in",
+        "z": "tab_cc",
+        "name": "weather readings",
+        "topic": "comcs/cell1/+/weather",
+        "qos": "1",
+        "datatype": "utf8",
+        "broker": "broker",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 130,
+        "y": 100,
+        "wires": [
+            [
+                "f_parse"
+            ]
+        ]
+    },
+    {
+        "id": "f_parse",
+        "type": "function",
+        "z": "tab_cc",
+        "name": "Validate WeatherObserved",
+        "func": "    // Accepts either a bare WeatherObserved (key-values) or the UDP protocol envelope\n// {\"kind\":\"reading\",\"payload\":{...WeatherObserved}} so both encodings work.\nconst MAX_LIVE_AGE_MS = 10000;   // older observations are rolling-window replays\nconst MAX_FUTURE_MS = 5000;      // tolerated clock skew\nconst now = Date.now();\nconst nodeFromTopic = msg.topic.split('/')[2];\n\nconst reject = (reason) => {\n    node.status({ fill: 'red', shape: 'ring', text: `${nodeFromTopic}: ${reason}` });\n    return [null, { topic: msg.topic, payload: { nodeId: nodeFromTopic, reason, raw: String(msg.payload).slice(0, 300) } }];\n};\n\nlet data;\ntry {\n    data = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch (e) {\n    return reject('invalid JSON');\n}\nconst envelope = data && data.kind === 'reading' ? data : null;\nconst wo = envelope ? data.payload : data;\n\nif (!wo || typeof wo !== 'object') return reject('empty payload');\nif (wo.type !== 'WeatherObserved') return reject('type is not WeatherObserved');\nif (typeof wo.id !== 'string' || !wo.id.startsWith('urn:ngsi-ld:WeatherObserved:')) return reject('invalid id');\nif (typeof wo.temperature !== 'number' || !Number.isFinite(wo.temperature)) return reject('invalid temperature');\nif (typeof wo.relativeHumidity !== 'number' || wo.relativeHumidity < 0 || wo.relativeHumidity > 1) {\n    return reject('relativeHumidity must be a fraction in [0,1]');\n}\nconst observed = Date.parse(wo.dateObserved);\nif (Number.isNaN(observed)) return reject('invalid dateObserved');\n\n// Duplicate suppression: QoS 1 redelivery and rolling-window replays reuse the same id.\nconst seen = context.get('seen') || [];\nif (seen.includes(wo.id)) {\n    node.status({ fill: 'yellow', shape: 'dot', text: `duplicate ${wo.id.split(':').pop()}` });\n    return [null, null];\n}\nseen.push(wo.id);\nif (seen.length > 1000) seen.splice(0, seen.length - 1000);\ncontext.set('seen', seen);\n\nconst synced = (envelope ? envelope.timeSynchronized : wo.timeSynchronized) !== false;\nconst skewed = observed - now > MAX_FUTURE_MS;\n// Untrusted clocks: fall back to reception time.\nconst t = synced && !skewed ? observed : now;\nconst live = now - t <= MAX_LIVE_AGE_MS;\nconst nodeId = (wo.refDevice || '').replace('urn:ngsi-ld:Device:', '') || nodeFromTopic;\n\nnode.status({ fill: live ? 'green' : 'blue', shape: 'dot', text: `${nodeId} ${wo.temperature}°C ${live ? 'live' : 'replay'}` });\nreturn [{\n    topic: nodeId,\n    payload: {\n        nodeId,\n        temperature: wo.temperature,\n        humidity: Math.round(wo.relativeHumidity * 1000) / 10,   // percent\n        observedAt: t,\n        receivedAt: now,\n        live,\n        timeTrusted: synced && !skewed\n    }\n}, null];",
+        "outputs": 2,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 370,
+        "y": 100,
+        "wires": [
+            [
+                "f_cell",
+                "f_health"
+            ],
+            [
+                "dbg_invalid"
+            ]
+        ],
+        "outputLabels": [
+            "valid reading",
+            "rejected"
+        ]
+    },
+    {
+        "id": "dbg_invalid",
+        "type": "debug",
+        "z": "tab_cc",
+        "name": "rejected readings",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": true,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "payload",
+        "statusType": "auto",
+        "x": 640,
+        "y": 140,
+        "wires": []
+    },
+    {
+        "id": "tick",
+        "type": "inject",
+        "z": "tab_cc",
+        "name": "tick 1 s",
+        "props": [
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "1",
+        "crontab": "",
+        "once": true,
+        "onceDelay": "1",
+        "topic": "tick",
+        "x": 130,
+        "y": 200,
+        "wires": [
+            [
+                "f_cell",
+                "f_health"
+            ]
+        ]
+    },
+    {
+        "id": "f_cell",
+        "type": "function",
+        "z": "tab_cc",
+        "name": "Cell averages",
+        "func": "    // Latest live reading per node; a node only counts towards the average while fresh.\nconst STALE_MS = 5000;\nconst latest = context.get('latest') || {};\nconst now = Date.now();\n\nif (msg.topic !== 'tick') {\n    const r = msg.payload;\n    const series = r.live ? r.nodeId : `${r.nodeId} (buffered)`;\n    if (r.live) {\n        latest[r.nodeId] = r;\n        context.set('latest', latest);\n    }\n    // Per-node history points at observation time (replays fill in the gaps).\n    return [null, null,\n        { topic: series, payload: { x: r.observedAt, y: r.temperature } },\n        { topic: series, payload: { x: r.observedAt, y: r.humidity } },\n        null];\n}\n\nconst fresh = Object.values(latest).filter((r) => now - r.receivedAt <= STALE_MS);\nif (fresh.length === 0) {\n    node.status({ fill: 'grey', shape: 'ring', text: 'no live nodes' });\n    return [null, null, null, null, { payload: 'No live data' }];\n}\nconst avg = (k) => Math.round(fresh.reduce((s, r) => s + r[k], 0) / fresh.length * 10) / 10;\nconst t = avg('temperature');\nconst h = avg('humidity');\nnode.status({ fill: 'green', shape: 'dot', text: `${t}°C ${h}% (${fresh.length} nodes)` });\nreturn [\n    { payload: t },\n    { payload: h },\n    { topic: 'average', payload: { x: now, y: t } },\n    { topic: 'average', payload: { x: now, y: h } },\n    { payload: `${fresh.length} node(s): ${fresh.map((r) => r.nodeId).sort().join(', ')}` }\n];",
+        "outputs": 5,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 640,
+        "y": 220,
+        "wires": [
+            [
+                "ui_g_temp"
+            ],
+            [
+                "ui_g_hum"
+            ],
+            [
+                "ui_c_temp"
+            ],
+            [
+                "ui_c_hum"
+            ],
+            [
+                "ui_t_nodes"
+            ]
+        ],
+        "outputLabels": [
+            "avg temperature",
+            "avg humidity",
+            "temperature chart",
+            "humidity chart",
+            "contributing nodes"
+        ]
+    },
+    {
+        "id": "ui_g_temp",
+        "type": "ui-gauge",
+        "z": "tab_cc",
+        "name": "Avg temperature",
+        "group": "g_avg",
+        "order": 1,
+        "width": "3",
+        "height": "3",
+        "gtype": "gauge-half",
+        "gstyle": "needle",
+        "title": "Avg temperature",
+        "alwaysShowTitle": false,
+        "floatingTitlePosition": "top-left",
+        "units": "°C",
+        "icon": "",
+        "prefix": "",
+        "suffix": "",
+        "segments": [
+            {
+                "from": "-10",
+                "color": "#5b8def"
+            },
+            {
+                "from": "0",
+                "color": "#2e9e44"
+            },
+            {
+                "from": "50",
+                "color": "#d32f2f"
+            }
+        ],
+        "min": -10,
+        "max": 60,
+        "sizeThickness": 16,
+        "sizeGap": 4,
+        "sizeKeyThickness": 8,
+        "styleRounded": true,
+        "styleGlow": false,
+        "className": "",
+        "value": "payload",
+        "valueType": "msg",
+        "x": 930,
+        "y": 160,
+        "wires": []
+    },
+    {
+        "id": "ui_g_hum",
+        "type": "ui-gauge",
+        "z": "tab_cc",
+        "name": "Avg humidity",
+        "group": "g_avg",
+        "order": 2,
+        "width": "3",
+        "height": "3",
+        "gtype": "gauge-half",
+        "gstyle": "needle",
+        "title": "Avg humidity",
+        "alwaysShowTitle": false,
+        "floatingTitlePosition": "top-left",
+        "units": "%",
+        "icon": "",
+        "prefix": "",
+        "suffix": "",
+        "segments": [
+            {
+                "from": "0",
+                "color": "#d32f2f"
+            },
+            {
+                "from": "20",
+                "color": "#2e9e44"
+            },
+            {
+                "from": "80",
+                "color": "#d32f2f"
+            }
+        ],
+        "min": 0,
+        "max": 100,
+        "sizeThickness": 16,
+        "sizeGap": 4,
+        "sizeKeyThickness": 8,
+        "styleRounded": true,
+        "styleGlow": false,
+        "className": "",
+        "value": "payload",
+        "valueType": "msg",
+        "x": 930,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "ui_c_temp",
+        "type": "ui-chart",
+        "z": "tab_cc",
+        "group": "g_hist",
+        "name": "Temperature (last hour)",
+        "label": "Temperature (last hour)",
+        "order": 1,
+        "chartType": "line",
+        "category": "topic",
+        "categoryType": "msg",
+        "xAxisLabel": "",
+        "xAxisProperty": "x",
+        "xAxisPropertyType": "property",
+        "xAxisType": "time",
+        "xAxisFormat": "",
+        "xAxisFormatType": "auto",
+        "xmin": "",
+        "xmax": "",
+        "yAxisLabel": "°C",
+        "yAxisProperty": "y",
+        "yAxisPropertyType": "property",
+        "ymin": "",
+        "ymax": "",
+        "bins": 10,
+        "action": "append",
+        "stackSeries": false,
+        "pointShape": "false",
+        "pointRadius": 4,
+        "showLegend": true,
+        "removeOlder": "1",
+        "removeOlderUnit": "3600",
+        "removeOlderPoints": "",
+        "colors": [
+            "#1f4e79",
+            "#e07b00",
+            "#2e9e44",
+            "#9467bd",
+            "#8c564b",
+            "#d62728",
+            "#17becf",
+            "#7f7f7f",
+            "#bcbd22"
+        ],
+        "textColor": [
+            "#666666"
+        ],
+        "textColorDefault": true,
+        "gridColor": [
+            "#e5e5e5"
+        ],
+        "gridColorDefault": true,
+        "width": "6",
+        "height": "8",
+        "className": "",
+        "interpolation": "linear",
+        "x": 930,
+        "y": 240,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "ui_c_hum",
+        "type": "ui-chart",
+        "z": "tab_cc",
+        "group": "g_hist",
+        "name": "Humidity (last hour)",
+        "label": "Humidity (last hour)",
+        "order": 2,
+        "chartType": "line",
+        "category": "topic",
+        "categoryType": "msg",
+        "xAxisLabel": "",
+        "xAxisProperty": "x",
+        "xAxisPropertyType": "property",
+        "xAxisType": "time",
+        "xAxisFormat": "",
+        "xAxisFormatType": "auto",
+        "xmin": "",
+        "xmax": "",
+        "yAxisLabel": "%",
+        "yAxisProperty": "y",
+        "yAxisPropertyType": "property",
+        "ymin": "",
+        "ymax": "",
+        "bins": 10,
+        "action": "append",
+        "stackSeries": false,
+        "pointShape": "false",
+        "pointRadius": 4,
+        "showLegend": true,
+        "removeOlder": "1",
+        "removeOlderUnit": "3600",
+        "removeOlderPoints": "",
+        "colors": [
+            "#1f4e79",
+            "#e07b00",
+            "#2e9e44",
+            "#9467bd",
+            "#8c564b",
+            "#d62728",
+            "#17becf",
+            "#7f7f7f",
+            "#bcbd22"
+        ],
+        "textColor": [
+            "#666666"
+        ],
+        "textColorDefault": true,
+        "gridColor": [
+            "#e5e5e5"
+        ],
+        "gridColorDefault": true,
+        "width": "6",
+        "height": "8",
+        "className": "",
+        "interpolation": "linear",
+        "x": 930,
+        "y": 280,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "ui_t_nodes",
+        "type": "ui-text",
+        "z": "tab_cc",
+        "group": "g_avg",
+        "order": 3,
+        "width": "6",
+        "height": "1",
+        "name": "contributing nodes",
+        "label": "Averaging",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "style": false,
+        "font": "",
+        "fontSize": 16,
+        "color": "#717171",
+        "wrapText": false,
+        "className": "",
+        "value": "payload",
+        "valueType": "msg",
+        "x": 930,
+        "y": 320,
+        "wires": []
+    },
+    {
+        "id": "c_health",
+        "type": "comment",
+        "z": "tab_cc",
+        "name": "Failure detection: LWT status topics + data watchdog + broker connection",
+        "info": "",
+        "x": 280,
+        "y": 400,
+        "wires": []
+    },
+    {
+        "id": "in_status",
+        "type": "mqtt in",
+        "z": "tab_cc",
+        "name": "component status (LWT)",
+        "topic": "comcs/cell1/+/status",
+        "qos": "1",
+        "datatype": "utf8",
+        "broker": "broker",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 150,
+        "y": 460,
+        "wires": [
+            [
+                "f_health"
+            ]
+        ]
+    },
+    {
+        "id": "f_health",
+        "type": "function",
+        "z": "tab_cc",
+        "name": "Component health",
+        "func": "    // Combines MQTT Last-Will status (\"online\"/\"offline\", retained) with a data\n// watchdog: a sensor node that is \"online\" but silent for STALE_MS is STALE.\nconst STALE_MS = 5000;\nconst EXPECTED = env.get('EXPECTED_COMPONENTS') || 'esp32-001,esp32-002,alert-server';\nconst comps = context.get('comps') || {};\nconst now = Date.now();\nconst get = (id) => (comps[id] = comps[id] || { connection: 'unknown', lastData: 0, state: '' });\n\nEXPECTED.split(',').map((s) => s.trim()).filter(Boolean).forEach(get);\n\nif (msg.topic === 'tick') {\n    // fall through to evaluation\n} else if (msg.topic.endsWith('/status')) {\n    const id = msg.topic.split('/')[2];\n    if (id === 'command-centre') return null;\n    get(id).connection = String(msg.payload).trim().toLowerCase() === 'online' ? 'online' : 'offline';\n} else if (msg.payload && msg.payload.nodeId) {\n    get(msg.payload.nodeId).lastData = msg.payload.receivedAt;\n    if (msg.payload.live && get(msg.payload.nodeId).connection === 'unknown') {\n        get(msg.payload.nodeId).connection = 'online';\n    }\n}\n\nconst notifications = [];\nconst rows = Object.keys(comps).sort().map((id) => {\n    const c = comps[id];\n    const isSensor = id !== 'alert-server';\n    const age = c.lastData ? now - c.lastData : null;\n    let state = 'OK';\n    if (c.connection === 'offline') state = 'OFFLINE';\n    else if (isSensor && (age === null || age > STALE_MS)) state = c.lastData ? 'STALE' : 'NO DATA';\n    else if (c.connection === 'unknown') state = 'UNKNOWN';\n    if (c.state && c.state !== state && (state === 'OFFLINE' || state === 'STALE' || c.state === 'OFFLINE' || c.state === 'STALE')) {\n        notifications.push({ payload: `${id}: ${c.state} → ${state}` });\n    }\n    c.state = state;\n    return {\n        Component: id,\n        Connection: c.connection,\n        'Last data': isSensor ? (age === null ? '—' : `${Math.round(age / 1000)} s ago`) : 'n/a',\n        State: state\n    };\n});\ncontext.set('comps', comps);\n\nconst bad = rows.filter((r) => r.State !== 'OK').length;\nnode.status({ fill: bad ? 'red' : 'green', shape: 'dot', text: bad ? `${bad} component(s) degraded` : 'all OK' });\nreturn [{ payload: rows }, notifications.length ? notifications : null];",
+        "outputs": 2,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 420,
+        "y": 500,
+        "wires": [
+            [
+                "ui_tbl_health"
+            ],
+            [
+                "ui_notify"
+            ]
+        ],
+        "outputLabels": [
+            "health table",
+            "state changes"
+        ]
+    },
+    {
+        "id": "ui_tbl_health",
+        "type": "ui-table",
+        "z": "tab_cc",
+        "group": "g_health",
+        "name": "health",
+        "label": "Components",
+        "order": 1,
+        "width": "6",
+        "height": "0",
+        "maxrows": 0,
+        "passthru": false,
+        "autocols": true,
+        "showSearch": false,
+        "deselect": true,
+        "selectionType": "none",
+        "columns": [],
+        "mobileBreakpoint": "sm",
+        "mobileBreakpointType": "defaults",
+        "action": "replace",
+        "className": "",
+        "x": 700,
+        "y": 480,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "st_broker",
+        "type": "status",
+        "z": "tab_cc",
+        "name": "broker connection",
+        "scope": [
+            "in_weather",
+            "in_status",
+            "in_alerts"
+        ],
+        "x": 140,
+        "y": 560,
+        "wires": [
+            [
+                "f_broker"
+            ]
+        ]
+    },
+    {
+        "id": "f_broker",
+        "type": "function",
+        "z": "tab_cc",
+        "name": "Broker state",
+        "func": "    // Status events from the mqtt-in nodes: green = connected, red = disconnected, yellow = connecting.\nconst fill = msg.status && msg.status.fill;\nconst text = fill === 'green' ? 'Connected' : fill === 'yellow' ? 'Connecting…' : 'DISCONNECTED';\nif (context.get('last') === text) return null;\ncontext.set('last', text);\nreturn { payload: text };",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 400,
+        "y": 560,
+        "wires": [
+            [
+                "ui_t_broker"
+            ]
+        ]
+    },
+    {
+        "id": "ui_t_broker",
+        "type": "ui-text",
+        "z": "tab_cc",
+        "group": "g_health",
+        "order": 2,
+        "width": "6",
+        "height": "1",
+        "name": "broker state",
+        "label": "MQTT broker",
+        "format": "{{msg.payload}}",
+        "layout": "row-spread",
+        "style": false,
+        "font": "",
+        "fontSize": 16,
+        "color": "#717171",
+        "wrapText": false,
+        "className": "",
+        "value": "payload",
+        "valueType": "msg",
+        "x": 700,
+        "y": 560,
+        "wires": []
+    },
+    {
+        "id": "c_alerts",
+        "type": "comment",
+        "z": "tab_cc",
+        "name": "Alerts: comcs/cell1/alerts (Smart Data Model Alert) from the UDP alert server",
+        "info": "",
+        "x": 260,
+        "y": 660,
+        "wires": []
+    },
+    {
+        "id": "in_alerts",
+        "type": "mqtt in",
+        "z": "tab_cc",
+        "name": "alerts",
+        "topic": "comcs/cell1/alerts",
+        "qos": "1",
+        "datatype": "utf8",
+        "broker": "broker",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 110,
+        "y": 720,
+        "wires": [
+            [
+                "f_alert"
+            ]
+        ]
+    },
+    {
+        "id": "ui_btn_ack",
+        "type": "ui-button",
+        "z": "tab_cc",
+        "group": "g_alert",
+        "name": "acknowledge",
+        "label": "Acknowledge",
+        "order": 2,
+        "width": "2",
+        "height": "1",
+        "emulateClick": false,
+        "tooltip": "",
+        "color": "",
+        "bgcolor": "",
+        "className": "",
+        "icon": "check",
+        "iconPosition": "left",
+        "payload": "ack",
+        "payloadType": "str",
+        "topic": "ack",
+        "topicType": "str",
+        "buttonColor": "",
+        "textColor": "",
+        "iconColor": "",
+        "enableClick": true,
+        "enablePointerdown": false,
+        "pointerdownPayload": "",
+        "pointerdownPayloadType": "str",
+        "enablePointerup": false,
+        "pointerupPayload": "",
+        "pointerupPayloadType": "str",
+        "x": 120,
+        "y": 780,
+        "wires": [
+            [
+                "f_alert"
+            ]
+        ]
+    },
+    {
+        "id": "f_alert",
+        "type": "function",
+        "z": "tab_cc",
+        "name": "Process alert",
+        "func": "    // Expected payload: Smart Data Model \"Alert\" (key-values). Unknown shapes are still shown.\nconst MAX_ROWS = 50;\nconst log = context.get('log') || [];\nlet unacked = context.get('unacked') || 0;\nconst indicator = () => ({ payload: {\n    active: unacked > 0,\n    text: unacked > 0 ? `${unacked} unacknowledged · last: ${log[0].Description}` : 'No unacknowledged alerts'\n} });\n\nif (msg.topic === 'ack') {\n    unacked = 0;\n    context.set('unacked', 0);\n    node.status({ fill: 'green', shape: 'dot', text: 'acknowledged' });\n    return [null, null, indicator()];\n}\n\nlet a;\ntry {\n    a = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch (e) {\n    a = { description: String(msg.payload) };\n}\nif (!a || typeof a !== 'object') a = { description: String(a) };\n\n// Deduplicate QoS 1 redeliveries by Alert id.\nconst ids = context.get('ids') || [];\nif (a.id && ids.includes(a.id)) return null;\nif (a.id) { ids.push(a.id); if (ids.length > 500) ids.shift(); context.set('ids', ids); }\n\nconst when = a.dateIssued ? new Date(a.dateIssued) : new Date();\nconst row = {\n    Time: isNaN(when) ? String(a.dateIssued) : when.toLocaleString('pt-PT'),\n    Severity: a.severity || 'unknown',\n    Category: a.subCategory || a.category || '',\n    Description: a.description || JSON.stringify(a).slice(0, 200),\n    Source: (a.alertSource || '').replace('urn:ngsi-ld:Device:', '')\n};\nlog.unshift(row);\nif (log.length > MAX_ROWS) log.length = MAX_ROWS;\nunacked += 1;\ncontext.set('log', log);\ncontext.set('unacked', unacked);\nnode.status({ fill: 'red', shape: 'dot', text: `${unacked} unacked: ${row.Description}` });\n\nreturn [\n    { payload: `⚠ [${row.Severity}] ${row.Description}` },\n    { payload: log },\n    indicator()\n];",
+        "outputs": 3,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "x": 340,
+        "y": 740,
+        "wires": [
+            [
+                "ui_notify"
+            ],
+            [
+                "ui_tbl_alerts"
+            ],
+            [
+                "ui_indicator"
+            ]
+        ],
+        "outputLabels": [
+            "notification",
+            "alert log",
+            "indicator"
+        ]
+    },
+    {
+        "id": "ui_notify",
+        "type": "ui-notification",
+        "z": "tab_cc",
+        "ui": "ui_base",
+        "name": "popup",
+        "position": "top right",
+        "colorDefault": false,
+        "color": "#d32f2f",
+        "displayTime": "6",
+        "showCountdown": true,
+        "outputs": 1,
+        "allowDismiss": true,
+        "dismissText": "Close",
+        "allowConfirm": false,
+        "confirmText": "Confirm",
+        "raw": false,
+        "className": "",
+        "x": 620,
+        "y": 700,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "ui_tbl_alerts",
+        "type": "ui-table",
+        "z": "tab_cc",
+        "group": "g_alert",
+        "name": "alert log",
+        "label": "Recent alerts",
+        "order": 3,
+        "width": "6",
+        "height": "0",
+        "maxrows": 8,
+        "passthru": false,
+        "autocols": true,
+        "showSearch": false,
+        "deselect": true,
+        "selectionType": "none",
+        "columns": [],
+        "mobileBreakpoint": "sm",
+        "mobileBreakpointType": "defaults",
+        "action": "replace",
+        "className": "",
+        "x": 630,
+        "y": 740,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "ui_indicator",
+        "type": "ui-template",
+        "z": "tab_cc",
+        "group": "g_alert",
+        "page": "",
+        "ui": "",
+        "name": "alert indicator",
+        "order": 1,
+        "width": "4",
+        "height": "2",
+        "head": "",
+        "format": "<template>\n  <div class=\"d-flex align-center\" style=\"gap: 12px\">\n    <v-icon :color=\"active ? 'red' : 'green'\" size=\"x-large\">{{ active ? 'mdi-alert' : 'mdi-check-circle' }}</v-icon>\n    <div>\n      <div class=\"text-h6\" :style=\"{ color: active ? '#d32f2f' : '#2e9e44' }\">{{ active ? 'ALERT' : 'Normal' }}</div>\n      <div class=\"text-caption\">{{ text }}</div>\n    </div>\n  </div>\n</template>\n<script>\nexport default {\n  computed: {\n    active () { return !!(this.msg && this.msg.payload && this.msg.payload.active) },\n    text () { return (this.msg && this.msg.payload && this.msg.payload.text) || 'No unacknowledged alerts' }\n  }\n}\n</script>",
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 640,
+        "y": 780,
+        "wires": [
+            []
+        ]
+    },
+    {
+        "id": "c_sim",
+        "type": "comment",
+        "z": "tab_sim",
+        "name": "Test data for the dashboard. Enable \"every 1 s\" (it is disabled by default) to stream readings.",
+        "info": "",
+        "x": 330,
+        "y": 40,
+        "wires": []
+    },
+    {
+        "id": "sim_tick",
+        "type": "inject",
+        "z": "tab_sim",
+        "d": true,
+        "name": "every 1 s",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "1",
+        "crontab": "",
+        "once": false,
+        "onceDelay": "0.1",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 120,
+        "y": 100,
+        "wires": [
+            [
+                "sim_gen"
+            ]
+        ]
+    },
+    {
+        "id": "sim_one",
+        "type": "inject",
+        "z": "tab_sim",
+        "name": "one reading each",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": "0.1",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 140,
+        "y": 140,
+        "wires": [
+            [
+                "sim_gen"
+            ]
+        ]
+    },
+    {
+        "id": "sim_gen",
+        "type": "function",
+        "z": "tab_sim",
+        "name": "simulate esp32-001/002",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "func": "        // Publishes WeatherObserved key-values for two nodes with a slowly drifting value.\n    const seq = (context.get('seq') || 0) + 1;\n    context.set('seq', seq);\n    const base = 22 + 2 * Math.sin(seq / 60);\n    const now = new Date().toISOString().replace(/\\.\\d+Z$/, 'Z');\n    const mk = (nodeId, dt, dh) => ({\n        topic: `comcs/cell1/${nodeId}/weather`,\n        qos: 1,\n        payload: JSON.stringify({\n            id: `urn:ngsi-ld:WeatherObserved:${nodeId}:sim:${seq}`,\n            type: 'WeatherObserved',\n            dateObserved: now,\n            location: { type: 'Point', coordinates: [-8.608, 41.178] },\n            refDevice: `urn:ngsi-ld:Device:${nodeId}`,\n            temperature: Math.round((base + dt + Math.random() * 0.4) * 10) / 10,\n            relativeHumidity: Math.round((0.5 + dh + Math.random() * 0.02) * 100) / 100\n        })\n    });\n    return [[mk('esp32-001', 0, 0), mk('esp32-002', 0.8, 0.03)]];",
+        "x": 380,
+        "y": 120,
+        "wires": [
+            [
+                "sim_out"
+            ]
+        ]
+    },
+    {
+        "id": "sim_alert_i",
+        "type": "inject",
+        "z": "tab_sim",
+        "name": "alert: temperature differential",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": "0.1",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 140,
+        "y": 200,
+        "wires": [
+            [
+                "sim_alert"
+            ]
+        ]
+    },
+    {
+        "id": "sim_alert",
+        "type": "function",
+        "z": "tab_sim",
+        "name": "alert: temperature differential",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "func": "    const now = new Date().toISOString().replace(/\\.\\d+Z$/, 'Z');\nreturn { topic: 'comcs/cell1/alerts', qos: 1, payload: JSON.stringify({\n    id: `urn:ngsi-ld:Alert:cell1:sim:${Date.now()}`,\n    type: 'Alert',\n    category: 'environment',\n    subCategory: 'temperatureDifferential',\n    severity: 'medium',\n    dateIssued: now,\n    description: 'Temperature differential 2.6 °C between esp32-001 and esp32-002 exceeds 2 °C',\n    alertSource: 'urn:ngsi-ld:Device:alert-server',\n    data: { differential: 2.6, threshold: 2, nodes: ['esp32-001', 'esp32-002'] }\n}) };",
+        "x": 380,
+        "y": 200,
+        "wires": [
+            [
+                "sim_out"
+            ]
+        ]
+    },
+    {
+        "id": "sim_off_i",
+        "type": "inject",
+        "z": "tab_sim",
+        "name": "esp32-002 offline (LWT)",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": "0.1",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 140,
+        "y": 260,
+        "wires": [
+            [
+                "sim_off"
+            ]
+        ]
+    },
+    {
+        "id": "sim_off",
+        "type": "function",
+        "z": "tab_sim",
+        "name": "esp32-002 offline (LWT)",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "func": "    return { topic: 'comcs/cell1/esp32-002/status', qos: 1, retain: true, payload: 'offline' };",
+        "x": 380,
+        "y": 260,
+        "wires": [
+            [
+                "sim_out"
+            ]
+        ]
+    },
+    {
+        "id": "sim_on_i",
+        "type": "inject",
+        "z": "tab_sim",
+        "name": "esp32-002 online",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": "0.1",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 140,
+        "y": 300,
+        "wires": [
+            [
+                "sim_on"
+            ]
+        ]
+    },
+    {
+        "id": "sim_on",
+        "type": "function",
+        "z": "tab_sim",
+        "name": "esp32-002 online",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "func": "    return { topic: 'comcs/cell1/esp32-002/status', qos: 1, retain: true, payload: 'online' };",
+        "x": 380,
+        "y": 300,
+        "wires": [
+            [
+                "sim_out"
+            ]
+        ]
+    },
+    {
+        "id": "sim_srv_i",
+        "type": "inject",
+        "z": "tab_sim",
+        "name": "alert-server online",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": "0.1",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 140,
+        "y": 340,
+        "wires": [
+            [
+                "sim_srv"
+            ]
+        ]
+    },
+    {
+        "id": "sim_srv",
+        "type": "function",
+        "z": "tab_sim",
+        "name": "alert-server online",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "func": "    return { topic: 'comcs/cell1/alert-server/status', qos: 1, retain: true, payload: 'online' };",
+        "x": 380,
+        "y": 340,
+        "wires": [
+            [
+                "sim_out"
+            ]
+        ]
+    },
+    {
+        "id": "sim_replay_i",
+        "type": "inject",
+        "z": "tab_sim",
+        "name": "buffered reading (2 min old)",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": "0.1",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 140,
+        "y": 380,
+        "wires": [
+            [
+                "sim_replay"
+            ]
+        ]
+    },
+    {
+        "id": "sim_replay",
+        "type": "function",
+        "z": "tab_sim",
+        "name": "buffered reading (2 min old)",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "func": "    const old = new Date(Date.now() - 120000).toISOString().replace(/\\.\\d+Z$/, 'Z');\nreturn { topic: 'comcs/cell1/esp32-001/weather', qos: 1, payload: JSON.stringify({\n    id: `urn:ngsi-ld:WeatherObserved:esp32-001:replay:${Date.now()}`, type: 'WeatherObserved', dateObserved: old,\n    location: { type: 'Point', coordinates: [-8.608, 41.178] }, refDevice: 'urn:ngsi-ld:Device:esp32-001',\n    temperature: 21.7, relativeHumidity: 0.49\n}) };",
+        "x": 380,
+        "y": 380,
+        "wires": [
+            [
+                "sim_out"
+            ]
+        ]
+    },
+    {
+        "id": "sim_bad_i",
+        "type": "inject",
+        "z": "tab_sim",
+        "name": "invalid reading",
+        "props": [
+            {
+                "p": "payload"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": "0.1",
+        "topic": "",
+        "payload": "",
+        "payloadType": "date",
+        "x": 140,
+        "y": 420,
+        "wires": [
+            [
+                "sim_bad"
+            ]
+        ]
+    },
+    {
+        "id": "sim_bad",
+        "type": "function",
+        "z": "tab_sim",
+        "name": "invalid reading",
+        "outputs": 1,
+        "timeout": 0,
+        "noerr": 0,
+        "initialize": "",
+        "finalize": "",
+        "libs": [],
+        "func": "    return { topic: 'comcs/cell1/esp32-001/weather', qos: 1, payload: '{\"type\":\"WeatherObserved\",\"temperature\":\"hot\"}' };",
+        "x": 380,
+        "y": 420,
+        "wires": [
+            [
+                "sim_out"
+            ]
+        ]
+    },
+    {
+        "id": "sim_out",
+        "type": "mqtt out",
+        "z": "tab_sim",
+        "name": "publish",
+        "topic": "",
+        "qos": "",
+        "retain": "",
+        "respTopic": "",
+        "contentType": "",
+        "userProps": "",
+        "correl": "",
+        "expiry": "",
+        "broker": "broker",
+        "x": 640,
+        "y": 240,
+        "wires": []
+    }
+]

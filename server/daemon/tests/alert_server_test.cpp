@@ -43,7 +43,8 @@ std::vector<Message> messages() {
 class AlertServerTest : public testing::Test {
 protected:
     ReadingStore store{":memory:"};
-    AlertServer server{store, {"127.0.0.1", 0}};
+    AlertLogic logic;
+    AlertServer server{store, logic, {"127.0.0.1", 0}};
     int peer = -1;
     UdpEndpoint peer_endpoint;
     UdpEndpoint server_endpoint;
@@ -224,7 +225,8 @@ TEST_F(AlertServerTest, PreservesSeparateClientEndpoints) {
 
 TEST(AlertServer, RejectsInvalidBindAddress) {
     ReadingStore store(":memory:");
-    EXPECT_THROW((AlertServer{store, {"invalid-address", 0}}), std::invalid_argument);
+    AlertLogic logic;
+    EXPECT_THROW((AlertServer{store, logic, {"invalid-address", 0}}), std::invalid_argument);
 }
 
 TEST_F(AlertServerTest, PropagatesInvalidDestinationErrors) {
@@ -302,7 +304,8 @@ TEST_F(AlertServerTest, DatabaseFailureSendsNoAcknowledgementAndAllowsRetry) {
     const std::unique_ptr<char, decltype(cleanup)> directory{pattern, cleanup};
     const auto path = (std::filesystem::path(created) / "readings.sqlite3").string();
     ReadingStore disk_store(path);
-    AlertServer disk_server(disk_store, {"127.0.0.1", 0});
+    AlertLogic logic;
+    AlertServer disk_server(disk_store, logic, {"127.0.0.1", 0});
     disk_server.send(Ack{identity()}, peer_endpoint);
     ASSERT_FALSE(receive_wire().empty());
     sqlite3* raw = nullptr;

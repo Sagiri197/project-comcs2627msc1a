@@ -1,6 +1,6 @@
 add_library(alert_server_core src/alert_server.cpp)
 target_include_directories(alert_server_core PUBLIC include)
-target_link_libraries(alert_server_core PUBLIC udp_socket common::protocol persistency)
+target_link_libraries(alert_server_core PUBLIC udp_socket common::protocol persistency alert_logic)
 
 add_executable(
     alert_server
