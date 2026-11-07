@@ -1,0 +1,56 @@
+@startuml system
+title System Overview - ESP32 Nodes, Alert Server and Command Centre
+
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam nodesep 60
+skinparam ranksep 70
+
+legend right
+  |= Line |= Protocol |
+  | <color:black>━━</color> | MQTT |
+  | <color:red>━━</color> | UDP (JSON datagrams, protocol v1) |
+  QoS 1 readings are stored, then answered
+  with an ACK / reject to the sending ESP32.
+  All devices are Wi-Fi clients of the AP
+  hosted by the Alert Server.
+endlegend
+
+frame "Wi-Fi network comcs-cell1 (192.168.50.0/24)" as WLAN {
+
+  node "Command Centre\n192.168.50.2 (cc.comcs.lan)" as CCBOX {
+    component "Node-RED\n(:1880)" as CC
+    queue "MQTT Broker\n(:1883)" as BROKER
+  }
+
+  node "Alert Server - Raspberry Pi 5\n192.168.50.1 (comcs.lan)" as AS {
+    component "Wi-Fi AP\n+ DHCP / DNS" as AP
+    component "UDP server\n(0.0.0.0:8080)" as UDP
+    database "readings.sqlite3" as DB
+    component "Alert Server" as ALERT
+  }
+
+  rectangle "Work cell" as CELL {
+    node "ESP32 A\n+ DHT11" as ESP1
+    node "ESP32 B\n+ DHT11" as ESP2
+    node "ESP32 C\n+ DHT11" as ESP3
+  }
+}
+
+' MQTT: telemetry from every node up to the Command Centre
+BROKER -[#black]up-> CC : MQTT
+ESP1 -[#black]up-> BROKER : MQTT
+ESP2 -[#black]up-> BROKER : MQTT
+ESP3 -[#black]up-> BROKER : MQTT
+
+' UDP: readings from every node to the Alert Server
+ESP1 -[#red]up-> UDP : UDP reading
+ESP2 -[#red]up-> UDP : UDP reading
+ESP3 -[#red]up-> UDP : UDP reading
+
+' Alert Server internals and alert forwarding over MQTT
+UDP -right-> DB : store
+UDP -up-> ALERT : readings
+ALERT -[#black]up-> BROKER : MQTT alerts
+
+@enduml
