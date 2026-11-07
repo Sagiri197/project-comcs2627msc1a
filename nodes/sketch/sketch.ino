@@ -22,14 +22,17 @@ bool timeSynchronized = false;
 
 std::string currentTimestamp() {
     struct tm timeinfo{};
-    if (!getLocalTime(&timeinfo, 1000)) {
+    if (!getLocalTime(&timeinfo, 5000)) { // Increased timeout to 5 seconds
+        Serial.println("getLocalTime failed");
         return {};
     }
 
     char timestamp[21]{};
     if (strftime(timestamp, sizeof(timestamp), "%Y-%m-%dT%H:%M:%SZ", &timeinfo) == 0) {
+        Serial.println("strftime failed");
         return {};
     }
+    
     return timestamp;
 }
 
@@ -51,6 +54,7 @@ void sendReading() {
         sequenceNumber--;
         return;
     }
+    
     if (timestamp.empty()) {
         Serial.println("Could not get synchronized timestamp");
         sequenceNumber--;
