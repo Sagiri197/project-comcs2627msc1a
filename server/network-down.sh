@@ -13,4 +13,9 @@ for con in "$AP_CON" "$CLIENT_CON"; do
     fi
 done
 rm -f /etc/NetworkManager/dnsmasq-shared.d/comcs.conf
+if [[ -f /etc/chrony/conf.d/comcs.conf ]]; then
+    log "No longer serving NTP to the cell"
+    rm -f /etc/chrony/conf.d/comcs.conf
+    systemctl restart chrony 2>/dev/null || true
+fi
 log "Cell network is down"

@@ -41,6 +41,10 @@ else
     printf '  %-22s %s\n' "ESP32 server_address" "${host_ip:--}"
 fi
 printf '  %-22s %s\n' "Alert server (UDP)" "${host_ip:--}:$ALERT_SERVER_UDP_PORT"
+if [[ "$active_con" == "$AP_CON" && "$NTP_SERVER" == yes ]]; then
+    printf '  %-22s %s  [chrony %b]\n' "NTP server" "$AP_DNS_NAME ($AP_ADDRESS):123" \
+        "$(state systemctl is-active --quiet chrony)"
+fi
 if [[ "$cc_host" == "$COMMAND_CENTRE_DNS_NAME" ]]; then
     printf '  %-22s %s\n' "MQTT broker" "$cc_host:$MQTT_PORT (= $COMMAND_CENTRE_ADDRESS)"
 else

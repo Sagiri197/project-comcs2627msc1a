@@ -23,11 +23,13 @@ Requires **Raspberry Pi OS Bookworm 64-bit** or newer, which uses NetworkManager
 ```
 server/                         (alongside the CMake sources: daemon/, udp/, persistency/, vendor/)
 ├── pi.env                      settings (SSID, password, addresses, mode)
-├── install.sh                  one-time setup: packages, Docker, build, systemd unit
+├── install.sh                  one-time setup: packages, build, systemd unit (+ Docker if RUN_COMMAND_CENTRE_ON_PI=yes)
 ├── build.sh                    rebuild + reinstall the alert server (after git pull)
 ├── up.sh / down.sh             whole cell up / down
 ├── network-up.sh / network-down.sh   only the network
 ├── status.sh                   state + endpoints to give the ESP32s
+├── monitor.sh                  live stats: IP, connected devices, UDP readings
+├── set-time.sh                 set the clock by hand (served by NTP when offline)
 └── comcs-alert-server.service  systemd unit
 ```
 
@@ -36,7 +38,7 @@ server/                         (alongside the CMake sources: daemon/, udp/, per
 ```bash
 git clone --recursive <repo-url> ~/comcs && cd ~/comcs
 nano server/pi.env           # or put overrides in server/pi.env.local (git-ignored)
-server/install.sh            # once (~10 min: Docker + C++ build)
+server/install.sh            # once (C++ build; also installs Docker if RUN_COMMAND_CENTRE_ON_PI=yes)
 server/up.sh                 # network + broker + Node-RED + alert server
 ```
 
@@ -61,7 +63,21 @@ Set `WIFI_MODE` in `pi.env`, or pass the mode as an argument: `server/up.sh clie
 In `nodes/configs/esp32_00X.h`, set `wifi_ssid` and `wifi_password` to the AP's values and
 `server_address` as shown in the table. The ports stay the same: UDP 8080 and MQTT 1883.
 
-Without an uplink in `ap` mode the ESP32s have no NTP. Use `time_synchronized = false` in that case.
+## Time (NTP)
+
+In `ap` mode the Pi is the cell's NTP server (chrony, `comcs.lan` / `192.168.50.1`, UDP 123),
+and it is also advertised by DHCP (option 42). ESP32s sync from it with
+`configTime(0, 0, "comcs.lan")`, with or without Internet.
+
+- **With an uplink** (Ethernet): chrony syncs from the public pools and relays that time.
+- **Without an uplink**: chrony serves the Pi's own clock, so make sure it is right. The Pi 5
+  keeps time across reboots only with an RTC battery. Otherwise, set the clock after boot,
+  for example by pushing the laptop's time:
+  `ssh <user>@comcs.lan "sudo ~/comcs/server/set-time.sh @<unix-seconds>"`
+  (the PowerShell form is in [set-time.sh](set-time.sh)).
+
+Check it with `chronyc tracking` (time source) and `sudo chronyc clients` (who is asking).
+`server/monitor.sh` shows both. Set `NTP_SERVER=no` in `pi.env` to turn it off.
 
 ## Connecting the Command Centre
 
@@ -87,6 +103,7 @@ the AP doesn't get Internet unless the Pi has an Ethernet uplink.
 
 ```bash
 server/status.sh                           # what is up, client count, endpoints
+server/monitor.sh -w                       # live: IP, connected devices (MAC/IP/node), UDP readings
 journalctl -u comcs-alert-server -f    # alert server logs
 docker compose -f command-centre/docker-compose.yml logs -f
 server/build.sh [--test]                   # after a git pull that touches server/ or common/

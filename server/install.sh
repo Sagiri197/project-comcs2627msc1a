@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # One-time setup of a Raspberry Pi 5 (Raspberry Pi OS Bookworm 64-bit) as the cell's server:
-# build tools, Docker, the alert server binary and its systemd unit.
+# build tools, the alert server binary and its systemd unit, plus Docker when
+# RUN_COMMAND_CENTRE_ON_PI=yes.
 # Re-running it is safe.
 #
 # Usage: server/install.sh        (asks for sudo; can also be run directly as root)
@@ -15,26 +16,31 @@ user="$(invoking_user)"
 log "Installing build tools and network utilities"
 apt-get update
 apt-get install -y --no-install-recommends \
-    git cmake build-essential ca-certificates curl iw rfkill dnsmasq-base mosquitto-clients
+    git cmake build-essential ca-certificates curl iw rfkill dnsmasq-base mosquitto-clients sqlite3 chrony
 
-if ! command -v docker >/dev/null || ! docker compose version >/dev/null 2>&1; then
-    log "Installing Docker Engine + compose plugin"
-    curl -fsSL https://get.docker.com | sh
-fi
-systemctl enable --now docker
-if [[ "$user" != root ]] && ! id -nG "$user" | grep -qw docker; then
-    usermod -aG docker "$user"
-    warn "added $user to the docker group: log out and back in to use docker without sudo"
-fi
+# Docker is only needed when the Command Centre (MQTT broker + Node-RED) runs on the Pi.
+if [[ "$RUN_COMMAND_CENTRE_ON_PI" == yes ]]; then
+    if ! command -v docker >/dev/null || ! docker compose version >/dev/null 2>&1; then
+        log "Installing Docker Engine + compose plugin"
+        curl -fsSL https://get.docker.com | sh
+    fi
+    systemctl enable --now docker
+    if [[ "$user" != root ]] && ! id -nG "$user" | grep -qw docker; then
+        usermod -aG docker "$user"
+        warn "added $user to the docker group: log out and back in to use docker without sudo"
+    fi
 
-# Docker publishes 1883 for the broker; a native mosquitto service would hold the port.
-if systemctl is-enabled --quiet mosquitto 2>/dev/null; then
-    log "Disabling the native mosquitto service (the broker runs in Docker)"
-    systemctl disable --now mosquitto
-fi
+    # Docker publishes 1883 for the broker; a native mosquitto service would hold the port.
+    if systemctl is-enabled --quiet mosquitto 2>/dev/null; then
+        log "Disabling the native mosquitto service (the broker runs in Docker)"
+        systemctl disable --now mosquitto
+    fi
 
-# Node-RED runs as uid 1000 in its container and writes flows.json into the checkout.
-chown -R 1000:1000 "$COMPOSE_DIR/nodered"
+    # Node-RED runs as uid 1000 in its container and writes flows.json into the checkout.
+    chown -R 1000:1000 "$COMPOSE_DIR/nodered"
+else
+    log "Command Centre runs on its own machine (RUN_COMMAND_CENTRE_ON_PI=no): skipping Docker"
+fi
 
 log "Building the alert server as $user"
 if [[ "$user" == root ]]; then

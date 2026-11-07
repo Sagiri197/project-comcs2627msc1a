@@ -49,6 +49,8 @@ up_ap() {
     COMMAND_CENTRE_MAC="$(tr 'A-F-' 'a-f:' <<< "$COMMAND_CENTRE_MAC")"
     {
         printf 'address=/%s/%s\n' "$AP_DNS_NAME" "$AP_ADDRESS"
+        # Advertise the Pi as NTP server (DHCP option 42) for clients that use it.
+        printf 'dhcp-option=option:ntp-server,%s\n' "$AP_ADDRESS"
         # Fixed lease + DNS name for the Command Centre, so the broker address never changes.
         if [[ -n "$COMMAND_CENTRE_MAC" ]]; then
             printf 'dhcp-host=%s,%s\n' "$COMMAND_CENTRE_MAC" "$COMMAND_CENTRE_ADDRESS"
@@ -64,10 +66,45 @@ up_ap() {
     nmcli connection up "$AP_CON" >/dev/null
     log "Access point is up. SSID '$AP_SSID', Pi at $AP_ADDRESS ($AP_DNS_NAME)"
     if [[ -n "$(ip -4 route show default 2>/dev/null | grep -v "dev $WIFI_IFACE" || true)" ]]; then
-        log "Internet from the Pi's uplink is NAT-shared to AP clients (NTP works on the ESP32s)"
+        log "Internet from the Pi's uplink is NAT-shared to AP clients"
     else
-        warn "No uplink (e.g. Ethernet): AP clients have no Internet, so ESP32 NTP sync will fail"
+        warn "No uplink (e.g. Ethernet): AP clients have no Internet. The Pi still serves NTP" \
+             "from its own clock; check it with 'date' (fix with server/set-time.sh)"
     fi
+
+    up_ntp
+}
+
+# Network address of ADDRESS/PREFIX, e.g. 192.168.50.1/24 -> 192.168.50.0/24.
+subnet_of() {
+    local a b c d mask n
+    IFS=. read -r a b c d <<< "$1"
+    n=$(( (a << 24) | (b << 16) | (c << 8) | d ))
+    mask=$(( (0xFFFFFFFF << (32 - $2)) & 0xFFFFFFFF ))
+    n=$(( n & mask ))
+    echo "$(( n >> 24 & 255 )).$(( n >> 16 & 255 )).$(( n >> 8 & 255 )).$(( n & 255 ))/$2"
+}
+
+# chrony serves time to the AP's clients. With Internet it relays the public pools; without,
+# "local" makes it keep serving the Pi's own clock (RTC / last known time) instead of refusing.
+up_ntp() {
+    [[ "$NTP_SERVER" == yes ]] || { log "NTP_SERVER=$NTP_SERVER: not serving NTP"; return; }
+    if ! command -v chronyd >/dev/null; then
+        warn "chrony is not installed (run server/install.sh): the Pi does not serve NTP"
+        return
+    fi
+
+    local subnet
+    subnet="$(subnet_of "$AP_ADDRESS" "$AP_PREFIX")"
+    mkdir -p /etc/chrony/conf.d
+    cat > /etc/chrony/conf.d/comcs.conf <<EOF
+# Written by server/network-up.sh - NTP for the cell's access point.
+allow $subnet
+local stratum $NTP_LOCAL_STRATUM orphan
+EOF
+    systemctl enable --now chrony >/dev/null 2>&1 || true
+    systemctl restart chrony
+    log "NTP server: $AP_ADDRESS ($AP_DNS_NAME) udp/123 for $subnet"
 }
 
 up_client() {
