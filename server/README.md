@@ -30,7 +30,7 @@ server/                         (alongside the CMake sources: daemon/, udp/, per
 ├── build.sh                    rebuild + reinstall the alert server (after git pull)
 ├── up.sh / down.sh             network + alert server up / down
 ├── status.sh                   state + endpoints to give the ESP32s
-├── monitor.sh                  live stats: IP, connected devices, UDP readings
+├── monitor.sh                  live dashboard: nodes, Wi-Fi stations, readings as they arrive
 ├── comcs-alert-server.service  systemd unit
 └── network/
     ├── up.sh / down.sh         only the network: AP or client Wi-Fi, DHCP/DNS, NTP
@@ -83,7 +83,7 @@ AP clients, so code using those defaults works too.
   (the PowerShell form is in [network/set-time.sh](network/set-time.sh)).
 
 Check it with `chronyc tracking` (time source) and `sudo chronyc clients` (who is asking).
-`server/monitor.sh` shows both. Set `NTP_SERVER=no` in `pi.env` to turn it off.
+`server/monitor.sh` shows whether chrony is up and how many clients it has. Set `NTP_SERVER=no` in `pi.env` to turn it off.
 
 ## Command Centre address
 
@@ -103,7 +103,7 @@ itself is covered in [command-centre/README.md](../command-centre/README.md).
 
 ```bash
 server/status.sh                           # what is up, client count, endpoints
-server/monitor.sh -w                       # live: IP, connected devices (MAC/IP/node), UDP readings
+server/monitor.sh                          # live dashboard: active nodes + readings feed (q quits; --once = snapshot)
 journalctl -u comcs-alert-server -f        # alert server logs
 server/build.sh [--test]                   # after a git pull that touches server/ or common/
 server/down.sh [--keep-network]            # stop the alert server (and remove the AP/client profile)

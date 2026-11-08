@@ -44,4 +44,4 @@ if [[ "$active_con" == "$AP_CON" ]]; then
         "$COMMAND_CENTRE_DNS_NAME:$MQTT_PORT (= $COMMAND_CENTRE_ADDRESS)"
 fi
 echo
-echo "Logs: journalctl -u $SERVICE -f   |   live stats: server/monitor.sh -w"
+echo "Logs: journalctl -u $SERVICE -f   |   live dashboard: server/monitor.sh"

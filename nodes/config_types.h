@@ -18,6 +18,8 @@ struct Config {
     const char* server_address;
     std::uint16_t server_port;
     std::uint16_t local_port;
+    const char* mqtt_host;      // Command Centre broker (cc.comcs.lan on the Pi's AP)
+    std::uint16_t mqtt_port;
     std::uint8_t dht_pin;
     double longitude;
     double latitude;
