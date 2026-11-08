@@ -9,7 +9,7 @@ inline constexpr Config config{
     .node_id = "esp32-003",
     .wifi_ssid = "Redmi Note 13",
     .wifi_password = "plplplpl",
-    .server_address = "10.177.197.123",
+    .server_address = "172.19.96.45",
     .server_port = 8080,
     .local_port = 4210,
     .dht_pin = 21,
