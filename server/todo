@@ -1,2 +1,2 @@
-- [ ] Persistir o schema direito e não o payload todo (se calhar tmb mas não só o payload)
-- [ ] Transaction tem de ser feitas imediatamente e não so quando o programa acabar 
+- [/] Persistir o schema direito e não o payload todo (se calhar tmb mas não só o payload)
+- [/] Transaction tem de ser feitas imediatamente e não so quando o programa acabar 
