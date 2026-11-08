@@ -243,7 +243,9 @@ draw() {
         elif (( age <= 4 * active_secs )); then status="${Y}● STALE${N}"
         else status="${R}○ LOST${N}"; fi
         if [[ -n "${N_ALERT[$node]:-}" ]] && (( now - N_ALERT[$node] <= 60 )); then status+="  ${R}${B}ALERT${N}"; fi
-        ip=${N_IP[$node]:-} mac=${IP_MAC[$ip]:-} sig=-
+        # No IP until the node's "Received from" log line is seen; bash rejects an empty key.
+        ip=${N_IP[$node]:-} mac= sig=-
+        if [[ -n "$ip" ]]; then mac=${IP_MAC[$ip]:-}; fi
         if [[ -n "$mac" && -n "${STA[$mac]:-}" ]]; then sig="$(fmt_sig "${STA[$mac]%%|*}")"; shown_mac[$mac]=1; fi
         out+=("$(printf '  %-14s %-21s %-12s %7s %6s %6s %5s %8s %5s %8s %-8s %s' \
             "$node" "${ip:+$ip:${N_PORT[$node]}}" "${N_SESSION[$node]:0:12}" "${N_SEQ[$node]:--}" \
