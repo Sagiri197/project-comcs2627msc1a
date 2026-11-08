@@ -3,7 +3,9 @@ target_include_directories(alert_logic PUBLIC include)
 target_include_directories(alert_logic PRIVATE ../persistency/include)
 target_link_libraries(alert_logic PUBLIC common::protocol spdlog::spdlog persistency)
 
-# Tests
-add_executable(alert_logic_tests tests/application_test.cpp)
-target_link_libraries(alert_logic_tests PRIVATE alert_logic gtest gtest_main)
-add_test(NAME AlertLogicTests COMMAND alert_logic_tests)
+if(BUILD_TESTING)
+    add_executable(alert_logic_tests tests/application_test.cpp)
+    target_link_libraries(alert_logic_tests PRIVATE alert_logic persistency GTest::gtest_main)
+    include(GoogleTest)
+    gtest_discover_tests(alert_logic_tests PROPERTIES TIMEOUT 5)
+endif()
