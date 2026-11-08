@@ -11,7 +11,9 @@ require_root "$@"
 
 mode="${1:-$WIFI_MODE}"
 
-command -v nmcli >/dev/null || die "nmcli not found. This needs Raspberry Pi OS Bookworm or newer (NetworkManager)."
+require_nmcli() {
+    command -v nmcli >/dev/null || die "nmcli not found. Modes ap and client need NetworkManager (Raspberry Pi OS Bookworm or newer); use mode none elsewhere (e.g. WSL)."
+}
 
 set_wifi_country() {
     if command -v raspi-config >/dev/null; then
@@ -137,8 +139,8 @@ up_client() {
 }
 
 case "$mode" in
-    ap)     up_ap ;;
-    client) up_client ;;
+    ap)     require_nmcli; up_ap ;;
+    client) require_nmcli; up_client ;;
     none)   log "WIFI_MODE=none, leaving the network as it is" ;;
     *)      die "unknown mode '$mode' (expected ap, client or none)" ;;
 esac

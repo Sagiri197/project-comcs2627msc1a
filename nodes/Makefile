@@ -1,16 +1,17 @@
 SHELL := /bin/sh
+# Run from this folder (cd nodes) or from the repo root with: make -C nodes <target>
 
 ARDUINO_CLI ?= arduino-cli
 FQBN ?= esp32:esp32:esp32s3
 FQBN_1 ?= esp32:esp32:esp32
 FQBN_2 ?= esp32:esp32:esp32s3
 FQBN_3 ?= esp32:esp32:esp32s3
-SKETCH ?= nodes/sketch
-BUILD_ROOT ?= build/arduino
+SKETCH ?= sketch
+BUILD_ROOT ?= build
 
 NODES ?= 1 2 3
 # Node for `make monitor` / `make flash-monitor`, and the baud rate (serial_baud in
-# nodes/configs/*.h).
+# configs/*.h).
 NODE ?= 1
 BAUD ?= 9600
 
