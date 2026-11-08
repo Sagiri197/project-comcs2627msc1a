@@ -913,3 +913,621 @@
 1794180234 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
 1794180234 [info] Humidity differential: 0.00% (threshold: 5.00%)
 1794180234 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=120
+1794180239 [info] ===== READING RECEIVED =====
+1794180239 [info] Node: esp32-002
+1794180239 [info] Session: boot-2901844471
+1794180239 [info] Sequence: 121
+1794180239 [info] Temperature: 21.80°C
+1794180239 [info] Humidity: 65.00%
+1794180239 [info] ============================
+1794180239 [info] Time difference: 4523ms
+1794180239 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180239 [info] Humidity differential: 1.00% (threshold: 5.00%)
+1794180239 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=121
+1794180243 [info] ===== READING RECEIVED =====
+1794180243 [info] Node: esp32-002
+1794180243 [info] Session: boot-2901844471
+1794180243 [info] Sequence: 122
+1794180243 [info] Temperature: 21.80°C
+1794180243 [info] Humidity: 65.00%
+1794180243 [info] ============================
+1794180243 [info] Time difference: 4527ms
+1794180243 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180243 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180243 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=122
+1794180248 [info] ===== READING RECEIVED =====
+1794180248 [info] Node: esp32-002
+1794180248 [info] Session: boot-2901844471
+1794180248 [info] Sequence: 123
+1794180248 [info] Temperature: 21.80°C
+1794180248 [info] Humidity: 65.00%
+1794180248 [info] ============================
+1794180248 [info] Time difference: 4527ms
+1794180248 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180248 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180248 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=123
+1794180252 [info] ===== READING RECEIVED =====
+1794180252 [info] Node: esp32-002
+1794180252 [info] Session: boot-2901844471
+1794180252 [info] Sequence: 124
+1794180252 [info] Temperature: 21.90°C
+1794180252 [info] Humidity: 65.00%
+1794180252 [info] ============================
+1794180252 [info] Time difference: 4532ms
+1794180252 [info] Temperature differential: 0.10°C (threshold: 2.00°C)
+1794180252 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180252 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=124
+1794180257 [info] ===== READING RECEIVED =====
+1794180257 [info] Node: esp32-002
+1794180257 [info] Session: boot-2901844471
+1794180257 [info] Sequence: 125
+1794180257 [info] Temperature: 21.80°C
+1794180257 [info] Humidity: 65.00%
+1794180257 [info] ============================
+1794180257 [info] Time difference: 4528ms
+1794180257 [info] Temperature differential: 0.10°C (threshold: 2.00°C)
+1794180257 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180257 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=125
+1794180261 [info] ===== READING RECEIVED =====
+1794180261 [info] Node: esp32-002
+1794180261 [info] Session: boot-2901844471
+1794180261 [info] Sequence: 126
+1794180261 [info] Temperature: 21.80°C
+1794180261 [info] Humidity: 65.00%
+1794180261 [info] ============================
+1794180261 [info] Time difference: 4525ms
+1794180261 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180261 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180261 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=126
+1794180266 [info] ===== READING RECEIVED =====
+1794180266 [info] Node: esp32-002
+1794180266 [info] Session: boot-2901844471
+1794180266 [info] Sequence: 127
+1794180266 [info] Temperature: 21.80°C
+1794180266 [info] Humidity: 65.00%
+1794180266 [info] ============================
+1794180266 [info] Time difference: 4843ms
+1794180266 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180266 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180266 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=127
+1794180271 [info] ===== READING RECEIVED =====
+1794180271 [info] Node: esp32-002
+1794180271 [info] Session: boot-2901844471
+1794180271 [info] Sequence: 128
+1794180271 [info] Temperature: 21.80°C
+1794180271 [info] Humidity: 65.00%
+1794180271 [info] ============================
+1794180271 [info] Time difference: 4527ms
+1794180271 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180271 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180271 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=128
+1794180275 [info] ===== READING RECEIVED =====
+1794180275 [info] Node: esp32-002
+1794180275 [info] Session: boot-2901844471
+1794180275 [info] Sequence: 129
+1794180275 [info] Temperature: 21.80°C
+1794180275 [info] Humidity: 65.00%
+1794180275 [info] ============================
+1794180275 [info] Time difference: 4532ms
+1794180275 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180275 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180275 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=129
+1794180280 [info] ===== READING RECEIVED =====
+1794180280 [info] Node: esp32-002
+1794180280 [info] Session: boot-2901844471
+1794180280 [info] Sequence: 130
+1794180280 [info] Temperature: 21.80°C
+1794180280 [info] Humidity: 65.00%
+1794180280 [info] ============================
+1794180280 [info] Time difference: 4528ms
+1794180280 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180280 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180280 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=130
+1794180284 [info] ===== READING RECEIVED =====
+1794180284 [info] Node: esp32-002
+1794180284 [info] Session: boot-2901844471
+1794180284 [info] Sequence: 131
+1794180284 [info] Temperature: 21.80°C
+1794180284 [info] Humidity: 65.00%
+1794180284 [info] ============================
+1794180284 [info] Time difference: 4529ms
+1794180284 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180284 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180284 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=131
+1794180289 [info] ===== READING RECEIVED =====
+1794180289 [info] Node: esp32-002
+1794180289 [info] Session: boot-2901844471
+1794180289 [info] Sequence: 132
+1794180289 [info] Temperature: 21.80°C
+1794180289 [info] Humidity: 65.00%
+1794180289 [info] ============================
+1794180289 [info] Time difference: 4546ms
+1794180289 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180289 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180289 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=132
+1794180293 [info] ===== READING RECEIVED =====
+1794180293 [info] Node: esp32-002
+1794180293 [info] Session: boot-2901844471
+1794180293 [info] Sequence: 133
+1794180293 [info] Temperature: 21.80°C
+1794180293 [info] Humidity: 65.00%
+1794180293 [info] ============================
+1794180293 [info] Time difference: 4531ms
+1794180293 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180293 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180293 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=133
+1794180298 [info] ===== READING RECEIVED =====
+1794180298 [info] Node: esp32-002
+1794180298 [info] Session: boot-2901844471
+1794180298 [info] Sequence: 134
+1794180298 [info] Temperature: 21.80°C
+1794180298 [info] Humidity: 65.00%
+1794180298 [info] ============================
+1794180298 [info] Time difference: 4526ms
+1794180298 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180298 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180298 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=134
+1794180302 [info] ===== READING RECEIVED =====
+1794180302 [info] Node: esp32-002
+1794180302 [info] Session: boot-2901844471
+1794180302 [info] Sequence: 135
+1794180302 [info] Temperature: 21.80°C
+1794180302 [info] Humidity: 65.00%
+1794180302 [info] ============================
+1794180302 [info] Time difference: 4529ms
+1794180302 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180302 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180302 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=135
+1794180308 [info] ===== READING RECEIVED =====
+1794180308 [info] Node: esp32-002
+1794180308 [info] Session: boot-2901844471
+1794180308 [info] Sequence: 136
+1794180308 [info] Temperature: 21.80°C
+1794180308 [info] Humidity: 65.00%
+1794180308 [info] ============================
+1794180308 [info] Time difference: 5545ms
+1794180308 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180308 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180308 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=136
+1794180313 [info] ===== READING RECEIVED =====
+1794180313 [info] Node: esp32-002
+1794180313 [info] Session: boot-2901844471
+1794180313 [info] Sequence: 137
+1794180313 [info] Temperature: 21.80°C
+1794180313 [info] Humidity: 65.00%
+1794180313 [info] ============================
+1794180313 [info] Time difference: 4622ms
+1794180313 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180313 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180313 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=137
+1794180317 [info] ===== READING RECEIVED =====
+1794180317 [info] Node: esp32-002
+1794180317 [info] Session: boot-2901844471
+1794180317 [info] Sequence: 138
+1794180317 [info] Temperature: 21.80°C
+1794180317 [info] Humidity: 65.00%
+1794180317 [info] ============================
+1794180317 [info] Time difference: 4527ms
+1794180317 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180317 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180317 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=138
+1794180322 [info] ===== READING RECEIVED =====
+1794180322 [info] Node: esp32-002
+1794180322 [info] Session: boot-2901844471
+1794180322 [info] Sequence: 139
+1794180322 [info] Temperature: 21.80°C
+1794180322 [info] Humidity: 65.00%
+1794180322 [info] ============================
+1794180322 [info] Time difference: 4537ms
+1794180322 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180322 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180322 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=139
+1794180326 [info] ===== READING RECEIVED =====
+1794180326 [info] Node: esp32-002
+1794180326 [info] Session: boot-2901844471
+1794180326 [info] Sequence: 140
+1794180326 [info] Temperature: 21.80°C
+1794180326 [info] Humidity: 65.00%
+1794180326 [info] ============================
+1794180326 [info] Time difference: 4526ms
+1794180326 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180326 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180326 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=140
+1794180331 [info] ===== READING RECEIVED =====
+1794180331 [info] Node: esp32-002
+1794180331 [info] Session: boot-2901844471
+1794180331 [info] Sequence: 141
+1794180331 [info] Temperature: 21.80°C
+1794180331 [info] Humidity: 65.00%
+1794180331 [info] ============================
+1794180331 [info] Time difference: 4528ms
+1794180331 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180331 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180331 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=141
+1794180335 [info] ===== READING RECEIVED =====
+1794180335 [info] Node: esp32-002
+1794180335 [info] Session: boot-2901844471
+1794180335 [info] Sequence: 142
+1794180335 [info] Temperature: 21.80°C
+1794180335 [info] Humidity: 65.00%
+1794180335 [info] ============================
+1794180335 [info] Time difference: 4526ms
+1794180335 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180335 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180335 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=142
+1794180340 [info] ===== READING RECEIVED =====
+1794180340 [info] Node: esp32-002
+1794180340 [info] Session: boot-2901844471
+1794180340 [info] Sequence: 143
+1794180340 [info] Temperature: 21.80°C
+1794180340 [info] Humidity: 66.00%
+1794180340 [info] ============================
+1794180340 [info] Time difference: 4529ms
+1794180340 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180340 [info] Humidity differential: 1.00% (threshold: 5.00%)
+1794180340 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=143
+1794180344 [info] ===== READING RECEIVED =====
+1794180344 [info] Node: esp32-002
+1794180344 [info] Session: boot-2901844471
+1794180344 [info] Sequence: 144
+1794180344 [info] Temperature: 21.80°C
+1794180344 [info] Humidity: 66.00%
+1794180344 [info] ============================
+1794180344 [info] Time difference: 4780ms
+1794180344 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180344 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180344 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=144
+1794180349 [info] ===== READING RECEIVED =====
+1794180349 [info] Node: esp32-002
+1794180349 [info] Session: boot-2901844471
+1794180349 [info] Sequence: 145
+1794180349 [info] Temperature: 21.80°C
+1794180349 [info] Humidity: 65.00%
+1794180349 [info] ============================
+1794180349 [info] Time difference: 4526ms
+1794180349 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180349 [info] Humidity differential: 1.00% (threshold: 5.00%)
+1794180349 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=145
+1794180354 [info] ===== READING RECEIVED =====
+1794180354 [info] Node: esp32-002
+1794180354 [info] Session: boot-2901844471
+1794180354 [info] Sequence: 146
+1794180354 [info] Temperature: 21.80°C
+1794180354 [info] Humidity: 65.00%
+1794180354 [info] ============================
+1794180354 [info] Time difference: 4529ms
+1794180354 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180354 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180354 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=146
+1794180358 [info] ===== READING RECEIVED =====
+1794180358 [info] Node: esp32-002
+1794180358 [info] Session: boot-2901844471
+1794180358 [info] Sequence: 147
+1794180358 [info] Temperature: 21.90°C
+1794180358 [info] Humidity: 65.00%
+1794180358 [info] ============================
+1794180358 [info] Time difference: 4527ms
+1794180358 [info] Temperature differential: 0.10°C (threshold: 2.00°C)
+1794180358 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180358 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=147
+1794180363 [info] ===== READING RECEIVED =====
+1794180363 [info] Node: esp32-002
+1794180363 [info] Session: boot-2901844471
+1794180363 [info] Sequence: 148
+1794180363 [info] Temperature: 21.80°C
+1794180363 [info] Humidity: 65.00%
+1794180363 [info] ============================
+1794180363 [info] Time difference: 4523ms
+1794180363 [info] Temperature differential: 0.10°C (threshold: 2.00°C)
+1794180363 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180363 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=148
+1794180367 [info] ===== READING RECEIVED =====
+1794180367 [info] Node: esp32-002
+1794180367 [info] Session: boot-2901844471
+1794180367 [info] Sequence: 149
+1794180367 [info] Temperature: 21.90°C
+1794180367 [info] Humidity: 65.00%
+1794180367 [info] ============================
+1794180367 [info] Time difference: 4529ms
+1794180367 [info] Temperature differential: 0.10°C (threshold: 2.00°C)
+1794180367 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180367 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=149
+1794180372 [info] ===== READING RECEIVED =====
+1794180372 [info] Node: esp32-002
+1794180372 [info] Session: boot-2901844471
+1794180372 [info] Sequence: 150
+1794180372 [info] Temperature: 21.90°C
+1794180372 [info] Humidity: 65.00%
+1794180372 [info] ============================
+1794180372 [info] Time difference: 4530ms
+1794180372 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180372 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180372 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=150
+1794180376 [info] ===== READING RECEIVED =====
+1794180376 [info] Node: esp32-002
+1794180376 [info] Session: boot-2901844471
+1794180376 [info] Sequence: 151
+1794180376 [info] Temperature: 21.90°C
+1794180376 [info] Humidity: 65.00%
+1794180376 [info] ============================
+1794180376 [info] Time difference: 4526ms
+1794180376 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180376 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180376 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=151
+1794180381 [info] ===== READING RECEIVED =====
+1794180381 [info] Node: esp32-002
+1794180381 [info] Session: boot-2901844471
+1794180381 [info] Sequence: 152
+1794180381 [info] Temperature: 21.90°C
+1794180381 [info] Humidity: 65.00%
+1794180381 [info] ============================
+1794180381 [info] Time difference: 4524ms
+1794180381 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180381 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180381 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=152
+1794180385 [info] ===== READING RECEIVED =====
+1794180385 [info] Node: esp32-002
+1794180385 [info] Session: boot-2901844471
+1794180385 [info] Sequence: 153
+1794180385 [info] Temperature: 21.90°C
+1794180385 [info] Humidity: 65.00%
+1794180385 [info] ============================
+1794180385 [info] Time difference: 4526ms
+1794180385 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180385 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180385 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=153
+1794180390 [info] ===== READING RECEIVED =====
+1794180390 [info] Node: esp32-002
+1794180390 [info] Session: boot-2901844471
+1794180390 [info] Sequence: 154
+1794180390 [info] Temperature: 21.90°C
+1794180390 [info] Humidity: 65.00%
+1794180390 [info] ============================
+1794180390 [info] Time difference: 4707ms
+1794180390 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180390 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180390 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=154
+1794180394 [info] ===== READING RECEIVED =====
+1794180394 [info] Node: esp32-002
+1794180394 [info] Session: boot-2901844471
+1794180394 [info] Sequence: 155
+1794180394 [info] Temperature: 21.90°C
+1794180394 [info] Humidity: 65.00%
+1794180394 [info] ============================
+1794180394 [info] Time difference: 4536ms
+1794180394 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180394 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180394 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=155
+1794180399 [info] ===== READING RECEIVED =====
+1794180399 [info] Node: esp32-002
+1794180399 [info] Session: boot-2901844471
+1794180399 [info] Sequence: 156
+1794180399 [info] Temperature: 21.90°C
+1794180399 [info] Humidity: 65.00%
+1794180399 [info] ============================
+1794180399 [info] Time difference: 4532ms
+1794180399 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180399 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180399 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=156
+1794180403 [info] ===== READING RECEIVED =====
+1794180403 [info] Node: esp32-002
+1794180403 [info] Session: boot-2901844471
+1794180403 [info] Sequence: 157
+1794180403 [info] Temperature: 21.90°C
+1794180403 [info] Humidity: 65.00%
+1794180403 [info] ============================
+1794180403 [info] Time difference: 4530ms
+1794180403 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180403 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180403 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=157
+1794180408 [info] ===== READING RECEIVED =====
+1794180408 [info] Node: esp32-002
+1794180408 [info] Session: boot-2901844471
+1794180408 [info] Sequence: 158
+1794180408 [info] Temperature: 21.80°C
+1794180408 [info] Humidity: 65.00%
+1794180408 [info] ============================
+1794180408 [info] Time difference: 4527ms
+1794180408 [info] Temperature differential: 0.10°C (threshold: 2.00°C)
+1794180408 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180408 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=158
+1794180413 [info] ===== READING RECEIVED =====
+1794180413 [info] Node: esp32-002
+1794180413 [info] Session: boot-2901844471
+1794180413 [info] Sequence: 159
+1794180413 [info] Temperature: 21.90°C
+1794180413 [info] Humidity: 65.00%
+1794180413 [info] ============================
+1794180413 [info] Time difference: 4530ms
+1794180413 [info] Temperature differential: 0.10°C (threshold: 2.00°C)
+1794180413 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180413 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=159
+1794180417 [info] ===== READING RECEIVED =====
+1794180417 [info] Node: esp32-002
+1794180417 [info] Session: boot-2901844471
+1794180417 [info] Sequence: 160
+1794180417 [info] Temperature: 21.90°C
+1794180417 [info] Humidity: 65.00%
+1794180417 [info] ============================
+1794180417 [info] Time difference: 4527ms
+1794180417 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180417 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180417 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=160
+1794180422 [info] ===== READING RECEIVED =====
+1794180422 [info] Node: esp32-002
+1794180422 [info] Session: boot-2901844471
+1794180422 [info] Sequence: 161
+1794180422 [info] Temperature: 21.80°C
+1794180422 [info] Humidity: 65.00%
+1794180422 [info] ============================
+1794180422 [info] Time difference: 4803ms
+1794180422 [info] Temperature differential: 0.10°C (threshold: 2.00°C)
+1794180422 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180422 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=161
+1794180426 [info] ===== READING RECEIVED =====
+1794180426 [info] Node: esp32-002
+1794180426 [info] Session: boot-2901844471
+1794180426 [info] Sequence: 162
+1794180426 [info] Temperature: 21.80°C
+1794180426 [info] Humidity: 65.00%
+1794180426 [info] ============================
+1794180426 [info] Time difference: 4526ms
+1794180426 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180426 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180426 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=162
+1794180431 [info] ===== READING RECEIVED =====
+1794180431 [info] Node: esp32-002
+1794180431 [info] Session: boot-2901844471
+1794180431 [info] Sequence: 163
+1794180431 [info] Temperature: 21.80°C
+1794180431 [info] Humidity: 65.00%
+1794180431 [info] ============================
+1794180431 [info] Time difference: 4540ms
+1794180431 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180431 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180431 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=163
+1794180435 [info] ===== READING RECEIVED =====
+1794180435 [info] Node: esp32-002
+1794180435 [info] Session: boot-2901844471
+1794180435 [info] Sequence: 164
+1794180435 [info] Temperature: 21.80°C
+1794180435 [info] Humidity: 65.00%
+1794180435 [info] ============================
+1794180435 [info] Time difference: 4531ms
+1794180435 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180435 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180435 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=164
+1794180440 [info] ===== READING RECEIVED =====
+1794180440 [info] Node: esp32-002
+1794180440 [info] Session: boot-2901844471
+1794180440 [info] Sequence: 165
+1794180440 [info] Temperature: 21.80°C
+1794180440 [info] Humidity: 65.00%
+1794180440 [info] ============================
+1794180440 [info] Time difference: 4704ms
+1794180440 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180440 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180440 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=165
+1794180445 [info] ===== READING RECEIVED =====
+1794180445 [info] Node: esp32-002
+1794180445 [info] Session: boot-2901844471
+1794180445 [info] Sequence: 166
+1794180445 [info] Temperature: 21.90°C
+1794180445 [info] Humidity: 65.00%
+1794180445 [info] ============================
+1794180445 [info] Time difference: 4539ms
+1794180445 [info] Temperature differential: 0.10°C (threshold: 2.00°C)
+1794180445 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180445 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=166
+1794180449 [info] ===== READING RECEIVED =====
+1794180449 [info] Node: esp32-002
+1794180449 [info] Session: boot-2901844471
+1794180449 [info] Sequence: 167
+1794180449 [info] Temperature: 21.90°C
+1794180449 [info] Humidity: 65.00%
+1794180449 [info] ============================
+1794180449 [info] Time difference: 4525ms
+1794180449 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180449 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180449 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=167
+1794180454 [info] ===== READING RECEIVED =====
+1794180454 [info] Node: esp32-002
+1794180454 [info] Session: boot-2901844471
+1794180454 [info] Sequence: 168
+1794180454 [info] Temperature: 21.90°C
+1794180454 [info] Humidity: 65.00%
+1794180454 [info] ============================
+1794180454 [info] Time difference: 4538ms
+1794180454 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180454 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180454 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=168
+1794180458 [info] ===== READING RECEIVED =====
+1794180458 [info] Node: esp32-002
+1794180458 [info] Session: boot-2901844471
+1794180458 [info] Sequence: 169
+1794180458 [info] Temperature: 21.90°C
+1794180458 [info] Humidity: 65.00%
+1794180458 [info] ============================
+1794180458 [info] Time difference: 4526ms
+1794180458 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180458 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180458 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=169
+1794180463 [info] ===== READING RECEIVED =====
+1794180463 [info] Node: esp32-002
+1794180463 [info] Session: boot-2901844471
+1794180463 [info] Sequence: 170
+1794180463 [info] Temperature: 21.90°C
+1794180463 [info] Humidity: 65.00%
+1794180463 [info] ============================
+1794180463 [info] Time difference: 4534ms
+1794180463 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180463 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180463 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=170
+1794180467 [info] ===== READING RECEIVED =====
+1794180467 [info] Node: esp32-002
+1794180467 [info] Session: boot-2901844471
+1794180467 [info] Sequence: 171
+1794180467 [info] Temperature: 21.90°C
+1794180467 [info] Humidity: 65.00%
+1794180467 [info] ============================
+1794180467 [info] Time difference: 4520ms
+1794180467 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180467 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180467 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=171
+1794180472 [info] ===== READING RECEIVED =====
+1794180472 [info] Node: esp32-002
+1794180472 [info] Session: boot-2901844471
+1794180472 [info] Sequence: 172
+1794180472 [info] Temperature: 21.90°C
+1794180472 [info] Humidity: 65.00%
+1794180472 [info] ============================
+1794180472 [info] Time difference: 4905ms
+1794180472 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180472 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180472 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=172
+1794180477 [info] ===== READING RECEIVED =====
+1794180477 [info] Node: esp32-002
+1794180477 [info] Session: boot-2901844471
+1794180477 [info] Sequence: 173
+1794180477 [info] Temperature: 21.90°C
+1794180477 [info] Humidity: 65.00%
+1794180477 [info] ============================
+1794180477 [info] Time difference: 4528ms
+1794180477 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180477 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180477 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=173
+1794180481 [info] ===== READING RECEIVED =====
+1794180481 [info] Node: esp32-002
+1794180481 [info] Session: boot-2901844471
+1794180481 [info] Sequence: 174
+1794180481 [info] Temperature: 21.90°C
+1794180481 [info] Humidity: 65.00%
+1794180481 [info] ============================
+1794180481 [info] Time difference: 4537ms
+1794180481 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180481 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180481 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=174
+1794180486 [info] ===== READING RECEIVED =====
+1794180486 [info] Node: esp32-002
+1794180486 [info] Session: boot-2901844471
+1794180486 [info] Sequence: 175
+1794180486 [info] Temperature: 21.90°C
+1794180486 [info] Humidity: 65.00%
+1794180486 [info] ============================
+1794180486 [info] Time difference: 4521ms
+1794180486 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180486 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180486 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=175
+1794180490 [info] ===== READING RECEIVED =====
+1794180490 [info] Node: esp32-002
+1794180490 [info] Session: boot-2901844471
+1794180490 [info] Sequence: 176
+1794180490 [info] Temperature: 21.90°C
+1794180490 [info] Humidity: 65.00%
+1794180490 [info] ============================
+1794180490 [info] Time difference: 4546ms
+1794180490 [info] Temperature differential: 0.00°C (threshold: 2.00°C)
+1794180490 [info] Humidity differential: 0.00% (threshold: 5.00%)
+1794180490 [debug] Received from 192.168.137.63:4210: node=esp32-002 session=boot-2901844471 seq=176
+1794180491 [info] Stopping
+1794180491 [info] MQTT status set to offline

@@ -92,13 +92,17 @@ package "persistency" as PERS {
 
 ' ---- udp ------------------------------------------------------------------------------------
 package "udp  (udp_socket)" as UDP {
-  class "UdpSocket" as SOCKET <<block>> {
+  interface "IUdpSocket" as SOCKET {
     values
     endpoint = 0.0.0.0:8080
     --
     recv() : UdpDatagram
     send(data, UdpEndpoint)
   }
+  class "PosixUdpSocket" as POSIX_SOCKET <<block>>
+  class "WindowsUdpSocket" as WIN_SOCKET <<block>>
+  POSIX_SOCKET .up.|> SOCKET
+  WIN_SOCKET .up.|> SOCKET
 }
 
 ' ---- mqtt -----------------------------------------------------------------------------------

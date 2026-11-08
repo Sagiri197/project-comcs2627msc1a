@@ -1,4 +1,4 @@
-// Windows (Winsock) implementation of UdpSocket. Built instead of udp_socket.cpp on Windows
+// Windows (Winsock) implementation of IUdpSocket. Built instead of udp_socket_posix.cpp on Windows
 // (see udp/CMakeLists.txt); WIN32_LEAN_AND_MEAN and NOMINMAX come from CMake.
 #include "udp_socket_windows.h"
 
@@ -55,7 +55,7 @@ UdpEndpoint endpoint_from(const sockaddr_in& address) {
 }
 }
 
-UdpSocket::UdpSocket(const UdpEndpoint& endpoint) : m_socket(INVALID_SOCKET) {
+WindowsUdpSocket::WindowsUdpSocket(const UdpEndpoint& endpoint) : m_socket(INVALID_SOCKET) {
 
     ensure_winsock();
     const auto address = socket_address(endpoint);
@@ -78,11 +78,11 @@ UdpSocket::UdpSocket(const UdpEndpoint& endpoint) : m_socket(INVALID_SOCKET) {
     m_socket = socket_handle;
 }
 
-UdpSocket::~UdpSocket() {
+WindowsUdpSocket::~WindowsUdpSocket() {
     closesocket(static_cast<SOCKET>(m_socket));
 }
 
-void UdpSocket::send(std::string_view data, const UdpEndpoint& destination) const {
+void WindowsUdpSocket::send(std::string_view data, const UdpEndpoint& destination) const {
 
     const auto address = socket_address(destination);
     if (sendto(static_cast<SOCKET>(m_socket), data.data(), static_cast<int>(data.size()), 0,
@@ -91,7 +91,7 @@ void UdpSocket::send(std::string_view data, const UdpEndpoint& destination) cons
     }
 }
 
-UdpDatagram UdpSocket::recv() const {
+UdpDatagram WindowsUdpSocket::recv() const {
 
     UdpDatagram datagram{std::string(PACKET_SIZE, 0), {}};
     sockaddr_in sender{};
@@ -109,4 +109,8 @@ UdpDatagram UdpSocket::recv() const {
     datagram.sender = endpoint_from(sender);
 
     return datagram;
+}
+
+std::unique_ptr<IUdpSocket> make_udp_socket(const UdpEndpoint& endpoint) {
+    return std::make_unique<WindowsUdpSocket>(endpoint);
 }

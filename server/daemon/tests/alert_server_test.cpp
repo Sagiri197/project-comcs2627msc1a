@@ -200,14 +200,14 @@ TEST_F(AlertServerTest, ValidatesMessagesBeforeSending) {
 }
 
 TEST_F(AlertServerTest, PreservesSeparateClientEndpoints) {
-    UdpSocket second_client{{"127.0.0.1", 0}};
+    const auto second_client = make_udp_socket({"127.0.0.1", 0});
     auto second_reading = reading();
     second_reading.identity.node_id = "esp32-b";
     second_reading.payload.ref_device = "urn:ngsi-ld:Device:esp32-b";
     second_reading.payload.id = "urn:ngsi-ld:WeatherObserved:esp32-b:boot-1:42";
 
     send_wire(encode(reading()));
-    second_client.send(encode(second_reading), server_endpoint);
+    second_client->send(encode(second_reading), server_endpoint);
     const auto first = server.receive();
     const auto second = server.receive();
     ASSERT_TRUE(std::holds_alternative<Reading>(first.message));
@@ -220,7 +220,7 @@ TEST_F(AlertServerTest, PreservesSeparateClientEndpoints) {
     EXPECT_EQ(std::get<Reading>(from_second.message).identity.node_id, "esp32-b");
 
     EXPECT_EQ(std::get<Ack>(decode(receive_wire())).identity.node_id, "esp32-a");
-    EXPECT_EQ(std::get<Ack>(decode(second_client.recv().data)).identity.node_id, "esp32-b");
+    EXPECT_EQ(std::get<Ack>(decode(second_client->recv().data)).identity.node_id, "esp32-b");
 }
 
 TEST(AlertServer, RejectsInvalidBindAddress) {

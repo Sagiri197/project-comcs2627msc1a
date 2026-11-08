@@ -1,4 +1,4 @@
-#include "udp_socket.h"
+#include "udp_socket_posix.h"
 
 #include <gtest/gtest.h>
 
@@ -14,7 +14,7 @@
 
 class UdpSocketTest : public testing::Test {
 protected:
-    UdpSocket socket;
+    PosixUdpSocket socket;
     int peer = -1;
     UdpEndpoint endpoint;
 
@@ -83,7 +83,7 @@ INSTANTIATE_TEST_SUITE_P(DatagramSizes, UdpPayloadTest, testing::Values(
     });
 
 TEST(UdpSocket, RejectsInvalidBindAddress) {
-    EXPECT_THROW((UdpSocket{{"invalid-address", 0}}), std::invalid_argument);
+    EXPECT_THROW((PosixUdpSocket{{"invalid-address", 0}}), std::invalid_argument);
 }
 
 TEST_F(UdpSocketTest, RejectsInvalidDestinationAddress) {
@@ -95,5 +95,5 @@ TEST_F(UdpSocketTest, RejectsOversizedDatagrams) {
 }
 
 TEST_F(UdpSocketTest, RejectsBindingAnOccupiedPort) {
-    EXPECT_THROW((UdpSocket{endpoint}), std::system_error);
+    EXPECT_THROW((PosixUdpSocket{endpoint}), std::system_error);
 }
