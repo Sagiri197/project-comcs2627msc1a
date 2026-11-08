@@ -56,3 +56,7 @@ Os valores especificos de cada dispositivo ficam em ficheiros separados:
 
 Antes de cada upload, escolher o dispositivo em `sketch/config.h`, alterando
 o valor por defeito de `NODE_PROFILE` para `1`, `2` ou `3`:
+
+### ESP32 esquemáticas
+
+![](./docs/esp32_controller.svg)

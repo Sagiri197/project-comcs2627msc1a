@@ -23,5 +23,7 @@ command-centre/nodered/package-lock.json
 command-centre/nodered/node_modules/
 command-centre/nodered/lib/
 command-centre/nodered/context/
+
 # Local overrides (passwords)
 access-point/ap.env.local
+

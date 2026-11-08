@@ -75,7 +75,7 @@ void AlertLogic::logReading(const common::protocol::Reading& reading) const {
     const auto& payload = reading.payload;
     const auto& identity = reading.identity;
     
-    spdlog::info("===== READING RECEIVED =====");
+    spdlog::info("Reading received from node {}", identity.node_id);
     spdlog::info("Node: {}", identity.node_id);
     spdlog::info("Session: {}", identity.session_id);
     spdlog::info("Sequence: {}", identity.seq);
@@ -96,29 +96,21 @@ inline void AlertLogic::logAlert(const ComparisonResult& result,
         return;
     }
     
-    spdlog::warn("⚠️  ALERT ⚠️");
+    spdlog::warn("ALERT");
     spdlog::warn("  Previous: {} ({:.2f}°C, {:.2f}%)", 
                  last.identity.node_id, last.payload.temperature, toPercent(last.payload.relative_humidity));
     spdlog::warn("  Current:  {} ({:.2f}°C, {:.2f}%)", 
                  current.identity.node_id, current.payload.temperature, toPercent(current.payload.relative_humidity));
     
-    if (result.exceeds_temp_threshold) {
-        spdlog::warn("  Temperature differential {:.2f}°C EXCEEDS threshold {:.2f}°C", 
-                     result.temperature_diff, TEMPERATURE_THRESHOLD);
-    }
+    if (result.exceeds_temp_threshold) 
+        spdlog::warn("\tTemperature differential {:.2f}°C EXCEEDS threshold {:.2f}°C", result.temperature_diff, TEMPERATURE_THRESHOLD);
     
-    if (result.exceeds_humidity_threshold) {
-        spdlog::warn("  Humidity differential {:.2f}% EXCEEDS threshold {:.2f}%", 
-                     result.humidity_diff, HUMIDITY_THRESHOLD);
-    }
+    if (result.exceeds_humidity_threshold) 
+        spdlog::warn("\tHumidity differential {:.2f}% EXCEEDS threshold {:.2f}%", result.humidity_diff, HUMIDITY_THRESHOLD);
     
-    if (result.out_of_temp_range) {
-        spdlog::warn("  Temperature OUT OF RANGE [{:.1f}°C - {:.1f}°C]", 
-                     TEMPERATURE_MIN, TEMPERATURE_MAX);
-    }
+    if (result.out_of_temp_range) 
+        spdlog::warn("\tTemperature OUT OF RANGE [{:.1f}°C - {:.1f}°C]", TEMPERATURE_MIN, TEMPERATURE_MAX);
     
-    if (result.out_of_humidity_range) {
-        spdlog::warn("  Humidity OUT OF RANGE [{:.1f}% - {:.1f}%]", 
-                     HUMIDITY_MIN, HUMIDITY_MAX);
-    }
+    if (result.out_of_humidity_range) 
+        spdlog::warn("\tHumidity OUT OF RANGE [{:.1f}% - {:.1f}%]", HUMIDITY_MIN, HUMIDITY_MAX);
 }
