@@ -2,6 +2,7 @@
 
 # Server gitignore
 server/build/   
+server/build-windows/
 server/doxygen/
 server/logs/
 *.sqlite3

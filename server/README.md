@@ -38,7 +38,8 @@ server/                         (alongside the CMake sources: daemon/, udp/, per
     │   ├── up.sh / down.sh     only the network: AP or client Wi-Fi, DHCP/DNS, NTP
     │   └── set-time.sh         set the clock by hand (served by NTP when offline)
     └── windows/                test without the Pi: Windows stands in for its network
-        └── up.cmd / down.cmd / status.cmd
+        ├── up.cmd / down.cmd / status.cmd   hotspot, names, NTP, firewall
+        └── build.cmd / run.cmd              native Windows build of the alert server (MSVC)
 ```
 
 ## Testing on Windows without the Pi
@@ -46,16 +47,23 @@ server/                         (alongside the CMake sources: daemon/, udp/, per
 `server\scripts\windows\up.cmd` makes a Windows laptop look like the Pi's network, so the
 ESP32 configs work unchanged:
 
-- Mobile hotspot with `AP_SSID` / `AP_PASSWORD` from `pi.env`, on 2.4 GHz.
-- The hotspot address is moved from Windows' `192.168.137.1` to the Pi's `AP_ADDRESS` (`192.168.50.1`).
-- `comcs.lan` and `cc.comcs.lan` resolve to it (hosts file; the hotspot's DNS answers from it).
-  The laptop plays both roles, so both names point to the same address.
+- Mobile hotspot with `AP_SSID` / `AP_PASSWORD` from `pi.env`, on 2.4 GHz. It keeps the address
+  Windows gives it (normally `192.168.137.1`, not the Pi's `192.168.50.1`): the nodes only use names.
+- `comcs.lan` and `cc.comcs.lan` resolve to the hotspot address (hosts file; the hotspot's DNS
+  answers from it). The laptop plays both roles, so both names point to the same address.
 - Windows Time serves NTP on udp/123, and the NTP names the ESP32s use point to it.
-- Firewall rules for UDP 8080, TCP 1883, TCP 1880 and UDP 123, including the Hyper-V firewall for WSL.
+- Firewall rules for UDP 8080, TCP 1883, TCP 1880 and UDP 123.
 
-Then run the Command Centre with Docker and the alert server in WSL (mirrored networking,
-`server/scripts/up.sh none`) or Docker. `status.cmd` shows the hotspot, its clients, the names
-and which ports have something listening. `down.cmd` undoes everything.
+Then run the Command Centre with Docker and the alert server natively:
+
+```powershell
+server\scripts\windows\build.cmd     # once, and after changes (Visual Studio Build Tools, C++)
+server\scripts\windows\run.cmd       # runs in this console, Ctrl+C to stop; database in server\build-windows\data
+```
+
+Not WSL: it does not mirror the hotspot adapter, so hotspot clients cannot reach a server in
+it. The unit tests are POSIX-only and are skipped in the Windows build. `status.cmd` shows the
+hotspot, its clients, the names and which ports have something listening. `down.cmd` undoes everything.
 
 The scripts ask for administrator rights (UAC) and run without changing the PowerShell execution
 policy. Mobile hotspot needs another connection to share (e.g. Ethernet), and may be disabled by

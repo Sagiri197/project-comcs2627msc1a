@@ -7,12 +7,12 @@ $ServerDir = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path   # server\ (
 $HostsFile = Join-Path $env:windir 'System32\drivers\etc\hosts'
 $HostsBegin = '# BEGIN comcs (server/scripts/windows)'
 $HostsEnd = '# END comcs'
+# Only used by down.ps1, to undo the address change made by earlier versions of up.ps1.
 $IcsParams = 'HKLM:\SYSTEM\CurrentControlSet\Services\SharedAccess\Parameters'
 $IcsDefaultAddress = '192.168.137.1'                                   # Windows' own hotspot default
 $W32TimeNtpServer = 'HKLM:\SYSTEM\CurrentControlSet\Services\W32Time\TimeProviders\NtpServer'
 $W32TimeConfig = 'HKLM:\SYSTEM\CurrentControlSet\Services\W32Time\Config'
 $FirewallPrefix = 'COMCS-Win-'
-$WslVmCreatorId = '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}'           # fixed id of WSL for Hyper-V firewall rules
 
 function Write-Step([string]$Message) { Write-Host "==> $Message" -ForegroundColor Blue }
 function Write-Warn([string]$Message) { Write-Host "warning: $Message" -ForegroundColor Yellow }
@@ -46,21 +46,23 @@ function Read-PiEnv {
             $settings[$key] = $value
         }
     }
-    foreach ($required in @('AP_SSID', 'AP_PASSWORD', 'AP_ADDRESS', 'AP_DNS_NAME')) {
+    foreach ($required in @('AP_SSID', 'AP_PASSWORD', 'AP_DNS_NAME')) {
         if (-not $settings.ContainsKey($required)) { throw "$required is missing from $ServerDir\pi.env" }
     }
     return $settings
 }
 
-# ICS reads ScopeAddress when sharing starts, which the hotspot start below triggers anyway.
-# Restarting the service is only a best effort: Windows often refuses to stop it.
-function Restart-IcsService {
-    if ((Get-Service SharedAccess).Status -ne 'Running') { return }
-    try {
-        Restart-Service SharedAccess -Force -ErrorAction Stop
-    } catch {
-        Write-Warn 'could not restart Internet Connection Sharing (normal on some machines); the hotspot picks up the address when it starts'
+# IPv4 address of the running hotspot (its Wi-Fi Direct virtual adapter), or $null.
+# Windows picks it (normally 192.168.137.1); the names in the hosts file follow it.
+function Get-HotspotAddress {
+    $adapters = Get-NetAdapter -IncludeHidden -ErrorAction SilentlyContinue |
+        Where-Object { $_.InterfaceDescription -like '*Wi-Fi Direct Virtual Adapter*' -and $_.Status -eq 'Up' }
+    foreach ($adapter in $adapters) {
+        $ip = Get-NetIPAddress -InterfaceIndex $adapter.ifIndex -AddressFamily IPv4 -ErrorAction SilentlyContinue |
+            Where-Object { $_.IPAddress -notlike '169.254.*' } | Select-Object -First 1
+        if ($ip) { return $ip.IPAddress }
     }
+    return $null
 }
 
 # ---- WinRT (Mobile hotspot API) ----------------------------------------------------------------
@@ -122,7 +124,19 @@ function Set-HostsBlock([string[]]$Entries) {
         foreach ($entry in $Entries) { $lines.Add($entry) }
         $lines.Add($HostsEnd)
     }
-    Set-Content -Path $HostsFile -Value $lines -Encoding ASCII
+    # Antivirus / the DNS client often hold the hosts file for a moment: retry for ~10 s.
+    $text = ($lines -join "`r`n") + "`r`n"
+    for ($attempt = 1; ; $attempt++) {
+        try {
+            [System.IO.File]::WriteAllText($HostsFile, $text, [System.Text.Encoding]::ASCII)
+            break
+        } catch [System.IO.IOException] {
+            if ($attempt -ge 20) {
+                throw "Could not write $HostsFile (still locked by another program after 10 s; antivirus?): $($_.Exception.Message)"
+            }
+            Start-Sleep -Milliseconds 500
+        }
+    }
     ipconfig /flushdns | Out-Null
 }
 

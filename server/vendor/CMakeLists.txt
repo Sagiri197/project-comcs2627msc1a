@@ -16,6 +16,11 @@ set(WITH_CJSON OFF CACHE BOOL "" FORCE)
 set(WITH_TLS OFF CACHE BOOL "" FORCE)
 set(WITH_STATIC_LIBRARIES ON CACHE BOOL "" FORCE)
 set(DOCUMENTATION OFF CACHE BOOL "" FORCE)
+if(WIN32)
+    # Threading on Windows needs pthreads4w; without it use mosquitto_loop() instead of
+    # mosquitto_loop_start().
+    set(WITH_THREADING OFF CACHE BOOL "" FORCE)
+endif()
 add_subdirectory(mosquitto EXCLUDE_FROM_ALL)
 foreach(mosquitto_target libmosquitto libmosquitto_static)
     foreach(link_property LINK_LIBRARIES INTERFACE_LINK_LIBRARIES)

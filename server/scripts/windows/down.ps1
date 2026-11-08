@@ -1,6 +1,6 @@
 <#
-Undo up.ps1: stop the hotspot, give it back Windows' default address (192.168.137.1), remove
-the hosts entries, turn off the Windows Time NTP server and remove the COMCS firewall rules.
+Undo up.ps1: stop the hotspot, remove the hosts entries, turn off the Windows Time NTP server
+and remove the COMCS firewall rules.
 
 Usage: server\scripts\windows\down.cmd      (asks for administrator rights)
 #>
@@ -13,10 +13,14 @@ if ($manager.TetheringOperationalState.ToString() -eq 'On') {
     $null = Wait-WinRtOperation ($manager.StopTetheringAsync()) ([Windows.Networking.NetworkOperators.NetworkOperatorTetheringOperationResult])
 }
 
-Write-Step "Hotspot address -> $IcsDefaultAddress (Windows default)"
-Set-ItemProperty -Path $IcsParams -Name ScopeAddress -Value $IcsDefaultAddress -Type String
-Set-ItemProperty -Path $IcsParams -Name ScopeAddressBackup -Value $IcsDefaultAddress -Type String
-Restart-IcsService
+# Earlier versions of up.ps1 moved the hotspot address; put Windows' default back
+# (it takes effect the next time the hotspot starts after a reboot).
+$scope = (Get-ItemProperty $IcsParams -ErrorAction SilentlyContinue).ScopeAddress
+if ($scope -and $scope -ne $IcsDefaultAddress) {
+    Write-Step "Hotspot address setting $scope -> $IcsDefaultAddress (Windows default)"
+    Set-ItemProperty -Path $IcsParams -Name ScopeAddress -Value $IcsDefaultAddress -Type String
+    Set-ItemProperty -Path $IcsParams -Name ScopeAddressBackup -Value $IcsDefaultAddress -Type String
+}
 
 Write-Step 'Removing the comcs hosts entries'
 Set-HostsBlock @()

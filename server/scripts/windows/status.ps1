@@ -14,7 +14,7 @@ function Show([string]$Label, [string]$Value, [bool]$Ok = $true) {
 }
 
 $cfg = Read-PiEnv
-$address = $cfg['AP_ADDRESS']
+$address = Get-HotspotAddress
 
 Write-Host ''
 Write-Host 'Hotspot'
@@ -34,26 +34,47 @@ try {
 } catch {
     Show 'state' "unavailable: $($_.Exception.Message)" $false
 }
-$scope = (Get-ItemProperty $IcsParams -ErrorAction SilentlyContinue).ScopeAddress
-Show 'configured address' "$scope" ($scope -eq $address)
-$live = Get-NetIPAddress -IPAddress $address -ErrorAction SilentlyContinue
-if ($live) { Show 'address in use' "$address on $($live.InterfaceAlias)" } else { Show 'address in use' "$address not assigned" $false }
+if ($address) { Show 'address' $address } else { Show 'address' 'none (hotspot off?)' $false }
 
 Write-Host 'Names (hosts file)'
 $block = @(Get-HostsBlock)
 if ($block.Count -eq 0) { Show 'entries' 'none (run up.cmd)' $false }
-foreach ($line in $block) { Write-Host "    $line" }
+foreach ($line in $block) {
+    $target = ($line -split '\s+')[0]
+    if ($address -and $target -eq $address) {
+        Write-Host "    $line"
+    } else {
+        Write-Host "    $line" -NoNewline
+        Write-Host '   <- not the hotspot address: run up.cmd again' -ForegroundColor Red
+    }
+}
 
 Write-Host 'Services on this machine'
 $ntpOn = (Get-ItemProperty $W32TimeNtpServer -ErrorAction SilentlyContinue).Enabled -eq 1
 Show 'NTP server (w32time)' $(if ($ntpOn) { "enabled, service $((Get-Service w32time).Status)" } else { 'disabled' }) $ntpOn
 $udp = @(Get-NetUDPEndpoint -ErrorAction SilentlyContinue)
 $tcp = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue)
-Show 'alert server udp/8080' $(if ($udp | Where-Object LocalPort -eq 8080) { 'listening' } else { 'nothing listening (WSL/Docker not running?)' }) ([bool]($udp | Where-Object LocalPort -eq 8080))
+if ($udp | Where-Object LocalPort -eq 8080) {
+    Show 'alert server udp/8080' 'listening'
+} else {
+    # Sockets inside WSL (mirrored mode) are not listed by Windows; ask WSL directly.
+    $inWsl = $false
+    if (Get-Command wsl.exe -ErrorAction SilentlyContinue) {
+        $wslOut = wsl.exe -e sh -c "ss -Hlun 'sport = :8080' 2>/dev/null" 2>$null
+        $inWsl = [bool]("$wslOut".Trim())
+    }
+    if ($inWsl) {
+        Show 'alert server udp/8080' 'listening in WSL only - hotspot clients cannot reach it (WSL does not mirror the hotspot adapter); stop it there and use run.cmd' $false
+    } else {
+        Show 'alert server udp/8080' 'nothing listening (build.cmd, then run.cmd)' $false
+    }
+}
 Show 'MQTT broker tcp/1883' $(if ($tcp | Where-Object LocalPort -eq 1883) { 'listening' } else { 'nothing listening (docker compose up?)' }) ([bool]($tcp | Where-Object LocalPort -eq 1883))
 Show 'Node-RED tcp/1880' $(if ($tcp | Where-Object LocalPort -eq 1880) { 'listening' } else { 'nothing listening' }) ([bool]($tcp | Where-Object LocalPort -eq 1880))
 $rules = @(Get-NetFirewallRule -Name "$FirewallPrefix*" -ErrorAction SilentlyContinue)
 Show 'firewall rules' "$($rules.Count) COMCS rules" ($rules.Count -gt 0)
 
 Write-Host ''
-Write-Host "ESP32 configs: server_address = $($cfg['AP_DNS_NAME']), mqtt_host = $($cfg['COMMAND_CENTRE_DNS_NAME']) (both = $address here)"
+$here = 'this machine'
+if ($address) { $here = $address }
+Write-Host "ESP32 configs: server_address = $($cfg['AP_DNS_NAME']), mqtt_host = $($cfg['COMMAND_CENTRE_DNS_NAME']) (both = $here)"
