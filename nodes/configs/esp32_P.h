@@ -9,7 +9,7 @@ inline constexpr Config config{
     .node_id = "esp32-002",
     .wifi_ssid = "comcs-cell1",
     .wifi_password = "comcs2627",
-    .server_address = "10.177.197.123",
+    .server_address = "comcs.lan",   // the Pi on its AP (AP_DNS_NAME in server/pi.env)
     .server_port = 8080,
     .local_port = 4210,
     .mqtt_host = "cc.comcs.lan",

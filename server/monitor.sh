@@ -164,7 +164,7 @@ refresh_net() {
         while read -r mac sig up; do
             [[ -n "$mac" ]] && STA[$mac]="$sig|$up"
         done < <(iw dev "$WIFI_IFACE" station dump 2>/dev/null | awk '
-            /^Station/        { mac = $2; sig[mac] = "?"; up[mac] = 0 }
+            /^Station/        { mac = $2; sig[mac] = "-"; up[mac] = 0 }
             /signal:/         { sig[mac] = $2 }
             /connected time:/ { up[mac] = $3 }
             END { for (m in sig) print m, sig[m], up[m] }')
@@ -206,6 +206,9 @@ fmt_hum() {
     else printf -- '-'; fi
 }
 
+# Some Wi-Fi drivers (e.g. the Pi's brcmfmac in AP mode) do not report station signal.
+fmt_sig() { if [[ "$1" == -[0-9]* ]]; then printf '%s dBm' "$1"; else printf -- '-'; fi; }
+
 fmt_temp() { if [[ -n "$1" ]]; then printf '%.1f°C' "$1" 2>/dev/null || printf '%s' "$1"; else printf -- '-'; fi; }
 
 updown() { if [[ "$1" == up* ]]; then printf '%s%s%s' "$G" "$1" "$N"; else printf '%s%s%s' "$R" "${1:--}" "$N"; fi; }
@@ -240,7 +243,7 @@ draw() {
         else status="${R}○ LOST${N}"; fi
         if [[ -n "${N_ALERT[$node]:-}" ]] && (( now - N_ALERT[$node] <= 60 )); then status+="  ${R}${B}ALERT${N}"; fi
         ip=${N_IP[$node]:-} mac=${IP_MAC[$ip]:-} sig=-
-        if [[ -n "$mac" && -n "${STA[$mac]:-}" ]]; then sig="${STA[$mac]%%|*} dBm"; shown_mac[$mac]=1; fi
+        if [[ -n "$mac" && -n "${STA[$mac]:-}" ]]; then sig="$(fmt_sig "${STA[$mac]%%|*}")"; shown_mac[$mac]=1; fi
         out+=("$(printf '  %-14s %-21s %-12s %7s %6s %6s %5s %8s %5s %8s %-8s %s' \
             "$node" "${ip:+$ip:${N_PORT[$node]}}" "${N_SESSION[$node]:0:12}" "${N_SEQ[$node]:--}" \
             "${N_COUNT[$node]:-0}" "${DB_COUNT[$node]:--}" "${N_LOSS[$node]:-0}" \
@@ -256,7 +259,7 @@ draw() {
         local name="${MAC_HOST[$mac]:-}"; [[ "$name" == "*" ]] && name=
         [[ "$mac" == "$CC_MAC" ]] && name=command-centre
         out+=("$(printf "  ${D}%-14s %-21s %-12s %7s %6s %6s %5s %8s %5s %8s %-8s %s${N}" \
-            "${name:-?}" "$ip" "" "" "" "" "" "" "" "${STA[$mac]%%|*} dBm" \
+            "${name:-?}" "$ip" "" "" "" "" "" "" "" "$(fmt_sig "${STA[$mac]%%|*}")" \
             "$(fmt_age "${STA[$mac]##*|}")" "wifi only")")
     done
 
