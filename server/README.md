@@ -26,28 +26,30 @@ Requires **Raspberry Pi OS Bookworm 64-bit** or newer, which uses NetworkManager
 ```
 server/                         (alongside the CMake sources: daemon/, udp/, persistency/, vendor/)
 ├── pi.env                      settings (SSID, password, addresses, mode)
-├── install.sh                  one-time setup: packages, build, systemd unit
-├── build.sh                    rebuild + reinstall the alert server (after git pull)
-├── up.sh / down.sh             network + alert server up / down
-├── status.sh                   state + endpoints to give the ESP32s
-├── monitor.sh                  live dashboard: nodes, Wi-Fi stations, readings as they arrive
 ├── comcs-alert-server.service  systemd unit
-└── network/
-    ├── up.sh / down.sh         only the network: AP or client Wi-Fi, DHCP/DNS, NTP
-    └── set-time.sh             set the clock by hand (served by NTP when offline)
+└── scripts/
+    ├── install.sh              one-time setup: packages, build, systemd unit
+    ├── build.sh                rebuild + reinstall the alert server (after git pull)
+    ├── up.sh / down.sh         network + alert server up / down
+    ├── status.sh               state + endpoints to give the ESP32s
+    ├── monitor.sh              live dashboard: nodes, Wi-Fi stations, readings as they arrive
+    ├── common.sh               shared helpers (sourced by the others)
+    └── network/
+        ├── up.sh / down.sh     only the network: AP or client Wi-Fi, DHCP/DNS, NTP
+        └── set-time.sh         set the clock by hand (served by NTP when offline)
 ```
 
 ## Setup
 
 ```bash
 git clone --recursive <repo-url> ~/comcs && cd ~/comcs
-nano server/pi.env           # or put overrides in server/pi.env.local (git-ignored)
-server/install.sh            # once (packages + C++ build)
-server/up.sh                 # network (AP, DHCP/DNS, NTP) + alert server
+nano server/pi.env                   # or put overrides in server/pi.env.local (git-ignored)
+server/scripts/install.sh            # once (packages + C++ build)
+server/scripts/up.sh                 # network (AP, DHCP/DNS, NTP) + alert server
 ```
 
 Everything is set to start at boot: the NetworkManager profile autoconnects, and chrony and the
-systemd unit are enabled. After a reboot the Pi comes back by itself. Run `server/status.sh`
+systemd unit are enabled. After a reboot the Pi comes back by itself. Run `server/scripts/status.sh`
 to check it.
 
 > **Over SSH:** switching `wlan0` to AP or client mode drops an SSH session that came in over
@@ -56,7 +58,7 @@ to check it.
 
 ## Network modes
 
-Set `WIFI_MODE` in `pi.env`, or pass the mode as an argument: `server/up.sh client`.
+Set `WIFI_MODE` in `pi.env`, or pass the mode as an argument: `server/scripts/up.sh client`.
 
 | Mode     | What happens | ESP32 `server_address` |
 |----------|--------------|------------------------|
@@ -79,11 +81,11 @@ AP clients, so code using those defaults works too.
 - **Without an uplink**: chrony serves the Pi's own clock, so make sure it is right. The Pi 5
   keeps time across reboots only with an RTC battery. Otherwise, set the clock after boot,
   for example by pushing the laptop's time:
-  `ssh <user>@comcs.lan "sudo ~/comcs/server/network/set-time.sh @<unix-seconds>"`
-  (the PowerShell form is in [network/set-time.sh](network/set-time.sh)).
+  `ssh <user>@comcs.lan "sudo ~/comcs/server/scripts/network/set-time.sh @<unix-seconds>"`
+  (the PowerShell form is in [scripts/network/set-time.sh](scripts/network/set-time.sh)).
 
 Check it with `chronyc tracking` (time source) and `sudo chronyc clients` (who is asking).
-`server/monitor.sh` shows whether chrony is up and how many clients it has. Set `NTP_SERVER=no` in `pi.env` to turn it off.
+`server/scripts/monitor.sh` shows whether chrony is up and how many clients it has. Set `NTP_SERVER=no` in `pi.env` to turn it off.
 
 ## Command Centre address
 
@@ -92,9 +94,9 @@ so the ESP32s and the alert server can always reach its broker:
 
 1. Set `COMMAND_CENTRE_MAC` in `pi.env` (or `pi.env.local`) to the MAC of the Command Centre's
    Wi-Fi adapter (Windows: `getmac /v`, Linux: `ip link`; either format works).
-2. Run `server/network/up.sh`. That machine then always gets `192.168.50.2`, and
+2. Run `server/scripts/network/up.sh`. That machine then always gets `192.168.50.2`, and
    `cc.comcs.lan` resolves to it.
-3. `server/status.sh` shows whether the Command Centre and its broker port are reachable.
+3. `server/scripts/status.sh` shows whether the Command Centre and its broker port are reachable.
 
 ESP32s and the alert server use `cc.comcs.lan:1883` as the MQTT broker. Setting up the broker
 itself is covered in [command-centre/README.md](../command-centre/README.md).
@@ -102,12 +104,12 @@ itself is covered in [command-centre/README.md](../command-centre/README.md).
 ## Day to day
 
 ```bash
-server/status.sh                           # what is up, client count, endpoints
-server/monitor.sh                          # live dashboard: active nodes + readings feed (q quits; --once = snapshot)
-journalctl -u comcs-alert-server -f        # alert server logs
-server/build.sh [--test]                   # after a git pull that touches server/ or common/
-server/down.sh [--keep-network]            # stop the alert server (and remove the AP/client profile)
-mosquitto_sub -h cc.comcs.lan -t 'comcs/#' -v   # watch the Command Centre's broker from the Pi
+server/scripts/status.sh                         # what is up, client count, endpoints
+server/scripts/monitor.sh                        # live dashboard: active nodes + readings feed (q quits; --once = snapshot)
+journalctl -u comcs-alert-server -f              # alert server logs
+server/scripts/build.sh [--test]                 # after a git pull that touches server/ or common/
+server/scripts/down.sh [--keep-network]          # stop the alert server (and remove the AP/client profile)
+mosquitto_sub -h cc.comcs.lan -t 'comcs/#' -v    # watch the Command Centre's broker from the Pi
 ```
 
 The readings database is `/var/lib/comcs-alert-server/readings.sqlite3`.

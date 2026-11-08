@@ -3,7 +3,7 @@
 # build tools, network utilities, the alert server binary and its systemd unit.
 # Re-running it is safe.
 #
-# Usage: server/install.sh        (asks for sudo; can also be run directly as root)
+# Usage: server/scripts/install.sh        (asks for sudo; can also be run directly as root)
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 require_root "$@"
 
@@ -19,9 +19,9 @@ apt-get install -y --no-install-recommends \
 
 log "Building the alert server as $user"
 if [[ "$user" == root ]]; then
-    bash "$PI_DIR/build.sh" --no-install
+    bash "$SCRIPTS_DIR/build.sh" --no-install
 else
-    sudo -u "$user" bash "$PI_DIR/build.sh" --no-install
+    sudo -u "$user" bash "$SCRIPTS_DIR/build.sh" --no-install
 fi
 install -m 0755 "$REPO_DIR/server/build/bin/alert_server" "$SERVER_BIN"
 
@@ -30,4 +30,4 @@ install -m 0644 "$PI_DIR/$SERVICE.service" "/etc/systemd/system/$SERVICE.service
 systemctl daemon-reload
 systemctl enable "$SERVICE"
 
-log "Done. Next: server/up.sh"
+log "Done. Next: server/scripts/up.sh"

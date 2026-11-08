@@ -3,7 +3,7 @@
 # restart the service if it is running. Run as the user who owns the checkout (uses sudo to
 # install), or as root when root owns the checkout.
 #
-# Usage: server/build.sh [--test] [--no-install]
+# Usage: server/scripts/build.sh [--test] [--no-install]
 #   --test        also build and run the unit tests (slower)
 #   --no-install  only build
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"

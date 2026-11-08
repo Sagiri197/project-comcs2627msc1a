@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Show the state of the cell network and services, and where to point the ESP32s.
 #
-# Usage: server/status.sh
+# Usage: server/scripts/status.sh
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 
 state() { if "$@" >/dev/null 2>&1; then printf '\033[32mup\033[0m'; else printf '\033[31mdown\033[0m'; fi; }
@@ -44,4 +44,4 @@ if [[ "$active_con" == "$AP_CON" ]]; then
         "$COMMAND_CENTRE_DNS_NAME:$MQTT_PORT (= $COMMAND_CENTRE_ADDRESS)"
 fi
 echo
-echo "Logs: journalctl -u $SERVICE -f   |   live dashboard: server/monitor.sh"
+echo "Logs: journalctl -u $SERVICE -f   |   live dashboard: server/scripts/monitor.sh"

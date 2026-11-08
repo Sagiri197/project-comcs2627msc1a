@@ -2,7 +2,7 @@
 # Live dashboard of the cell: the ESP32 nodes talking to the alert server, the Wi-Fi stations
 # on the AP and the readings as they arrive (followed from the alert server's journal).
 #
-# Usage: server/monitor.sh [-t SECONDS] [-b LINES] [-n ROWS] [--once]      (asks for sudo)
+# Usage: server/scripts/monitor.sh [-t SECONDS] [-b LINES] [-n ROWS] [--once]      (asks for sudo)
 #   -t SECONDS  a node is ACTIVE if it sent a reading in the last SECONDS (default 15)
 #   -b LINES    journal lines replayed at start-up to fill in history (default 3000)
 #   -n ROWS     cap the readings feed at ROWS lines (default: fill the terminal)
@@ -11,6 +11,7 @@
 source "$(dirname "${BASH_SOURCE[0]}")/common.sh"
 require_root "$@"
 shopt -s extglob
+export LC_NUMERIC=C   # printf '%.1f' must parse "21.80" even under a decimal-comma locale
 
 usage() { sed -n '2,10s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"; exit "${1:-0}"; }
 
@@ -321,10 +322,23 @@ fi
 exec {jfd}< <(exec journalctl -u "$SERVICE" -f -n "$backlog" -o short-unix --no-pager 2>/dev/null)
 jpid=$!
 
+# The alternate screen is wiped on exit, so keep stderr in a file and show it afterwards;
+# the ERR trap adds the failing line (errexit failures print nothing by themselves).
+errlog="$(mktemp)"
+exec {stderr_fd}>&2 2>"$errlog"
+set -E
+trap 'rc=$?; echo "monitor.sh: line $LINENO: \"$BASH_COMMAND\" failed (exit $rc)" >&2' ERR
+
 cleanup() {
     kill "$jpid" 2>/dev/null || true
     printf '\e[?7h\e[?25h\e[?1049l'
     stty echo 2>/dev/null || true
+    exec 2>&"$stderr_fd"
+    if [[ -s "$errlog" ]]; then
+        echo "monitor.sh stopped with an error:" >&2
+        tail -n 20 "$errlog" >&2
+    fi
+    rm -f "$errlog"
 }
 trap cleanup EXIT
 trap 'exit 0' INT TERM

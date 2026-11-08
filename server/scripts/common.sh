@@ -2,7 +2,8 @@
 # Shared helpers. Sourced by the other server/*.sh scripts, not run directly.
 set -euo pipefail
 
-PI_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # server/scripts
+PI_DIR="$(cd "$SCRIPTS_DIR/.." && pwd)"                          # server (pi.env, systemd unit)
 REPO_DIR="$(cd "$PI_DIR/.." && pwd)"
 
 AP_CON=comcs-ap

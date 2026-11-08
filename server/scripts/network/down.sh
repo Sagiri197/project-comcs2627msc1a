@@ -2,7 +2,7 @@
 # Take the cell network down and remove its NetworkManager profiles, so the Pi goes back to
 # its normal Wi-Fi at the next autoconnect.
 #
-# Usage: sudo server/network/down.sh
+# Usage: sudo server/scripts/network/down.sh
 source "$(dirname "${BASH_SOURCE[0]}")/../common.sh"
 require_root "$@"
 

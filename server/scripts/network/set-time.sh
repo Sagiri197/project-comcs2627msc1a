@@ -3,15 +3,15 @@
 # clock to the ESP32s). Also saves it to the RTC, so it survives a reboot if the Pi 5 RTC
 # has a battery.
 #
-# Usage: server/network/set-time.sh "2026-11-07 14:30:00"     local time
-#        server/network/set-time.sh @1794580200               Unix epoch seconds
+# Usage: server/scripts/network/set-time.sh "2026-11-07 14:30:00"     local time
+#        server/scripts/network/set-time.sh @1794580200               Unix epoch seconds
 #
 # From the Command Centre laptop, push its clock to the Pi (PowerShell):
-#   ssh <user>@comcs.lan "sudo ~/comcs/server/network/set-time.sh @$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
+#   ssh <user>@comcs.lan "sudo ~/comcs/server/scripts/network/set-time.sh @$([DateTimeOffset]::UtcNow.ToUnixTimeSeconds())"
 source "$(dirname "${BASH_SOURCE[0]}")/../common.sh"
 require_root "$@"
 
-[[ $# -eq 1 ]] || die "usage: server/network/set-time.sh \"YYYY-MM-DD HH:MM:SS\" | @EPOCH"
+[[ $# -eq 1 ]] || die "usage: server/scripts/network/set-time.sh \"YYYY-MM-DD HH:MM:SS\" | @EPOCH"
 
 log "Clock before: $(date '+%Y-%m-%d %H:%M:%S %Z')"
 date -s "$1" >/dev/null || die "could not parse '$1'"
