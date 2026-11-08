@@ -47,6 +47,7 @@ endif()
 
 add_subdirectory(../common "${CMAKE_CURRENT_BINARY_DIR}/common")
 add_subdirectory(udp)
+add_subdirectory(mqtt)
 add_subdirectory(persistency)
 add_subdirectory(application)
 add_subdirectory(daemon)

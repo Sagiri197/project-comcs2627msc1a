@@ -1,0 +1,157 @@
+@startuml alert_server_blocks
+title Alert Server - SysML Block Definition Diagram (server/)
+
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam packageStyle folder
+skinparam nodesep 50
+skinparam ranksep 60
+skinparam class {
+  BackgroundColor<<block>> #FFFFFF
+  BackgroundColor<<external>> #EEEEEE
+  BackgroundColor<<library>> #F6F0E0
+}
+hide empty members
+hide circle
+
+legend right
+  |= Line |= Meaning |
+  | ◆━━ | part (composition: the owner creates and holds it) |
+  | ◆━━> | part that the owner also calls |
+  | ━━> | call (operation on the target block) |
+  | ┄┄> | uses (link-time dependency) |
+  | <color:red>━━</color> | network flow (UDP / MQTT) |
+  Every module logs through spdlog (not drawn).
+  GoogleTest builds one test executable per module.
+endlegend
+
+' ---- external to server/ -------------------------------------------------------------------
+class "ESP32 node" as ESP32 <<external>> {
+  UDP client, JSON datagrams
+}
+class "MQTT broker\n(Command Centre)" as BROKER <<external>> {
+  cc.comcs.lan:1883
+}
+class "common::protocol" as PROTOCOL <<external>> {
+  Message = Reading | Ack | Reject
+  --
+  decode(json) : Message
+  encode(Message) : json
+}
+
+' ---- daemon ---------------------------------------------------------------------------------
+package "daemon  (alert_server executable)" as DAEMON {
+  class "alert_server (main)" as MAIN <<block>> {
+    values
+    udp_port = 8080
+    mqtt = on
+    --
+    receive loop: server.receive()
+    signal watcher thread
+  }
+  class "AlertServer" as SERVER <<block>> {
+    receive() : ReceivedMessage
+    send(Message, UdpEndpoint)
+  }
+  class "ServerStats" as STATS <<block>> {
+    values
+    readings, invalidDatagrams, storageErrors
+    lastReading
+    --
+    reading_received(node_id)
+    invalid_datagram()
+    storage_error()
+    heartbeat_json(port) : string
+  }
+}
+
+' ---- application ----------------------------------------------------------------------------
+package "application  (alert_logic)" as APP {
+  class "AlertLogic" as LOGIC <<block>> {
+    values
+    TEMPERATURE_THRESHOLD = 2.0 °C
+    HUMIDITY_THRESHOLD = 5.0 %
+    temperature range [0, 50] °C
+    humidity range [20, 80] %
+    --
+    processReading(Reading)
+  }
+}
+
+' ---- persistency ----------------------------------------------------------------------------
+package "persistency" as PERS {
+  class "ReadingStore" as STORE <<block>> {
+    values
+    path = readings.sqlite3
+    --
+    save(Reading) : Inserted | Duplicate
+    find(Identity) : Reading?
+    getLastReading() : Reading?
+  }
+}
+
+' ---- udp ------------------------------------------------------------------------------------
+package "udp  (udp_socket)" as UDP {
+  class "UdpSocket" as SOCKET <<block>> {
+    values
+    endpoint = 0.0.0.0:8080
+    --
+    recv() : UdpDatagram
+    send(data, UdpEndpoint)
+  }
+}
+
+' ---- mqtt -----------------------------------------------------------------------------------
+package "mqtt  (mqtt_status)" as MQTT {
+  class "StatusPublisher" as PUBLISHER <<block>> {
+    values
+    topic = comcs/cell1/alert-server
+    interval = 5 s
+    --
+    own thread: connect / reconnect
+    publish status, heartbeat
+  }
+}
+
+' ---- vendor ---------------------------------------------------------------------------------
+package "vendor" as VENDOR {
+  class "SQLite" as SQLITE <<library>> {
+    sqlite3 C API
+  }
+  class "mosquitto" as MOSQUITTO <<library>> {
+    libmosquitto_static
+  }
+  class "spdlog" as SPDLOG <<library>> {
+    console + logs/alert_server.log
+  }
+  class "GoogleTest" as GTEST <<library>> {
+    unit tests only
+  }
+}
+
+' ---- parts (who owns whom) ------------------------------------------------------------------
+MAIN *-- "1" STORE
+MAIN *-- "1" LOGIC
+MAIN *-- "0..1" PUBLISHER : not with --no-mqtt
+
+' ---- calls (parts that the owner also calls) ------------------------------------------------
+MAIN *--> "1" SERVER : receive()
+MAIN *--> "1" STATS : reading_received()\ninvalid_datagram()\nstorage_error()
+SERVER *--> "1" SOCKET : recv() / send(Ack)
+SERVER --> LOGIC : 1. processReading(reading)
+SERVER --> STORE : 2. save(reading)
+LOGIC --> STORE : getLastReading()
+PUBLISHER --> STATS : heartbeat_json()\n(callback given by main)
+
+' ---- uses -----------------------------------------------------------------------------------
+SERVER ..> PROTOCOL : decode() / encode()
+STORE ..> SQLITE
+PUBLISHER ..> MOSQUITTO
+MAIN ..> SPDLOG
+
+' ---- network flows --------------------------------------------------------------------------
+ESP32 -[#red]-> SOCKET : UDP :8080\nReading (JSON)
+SOCKET -[#red]-> ESP32 : Ack (QoS 1)
+PUBLISHER -[#red]-> BROKER : MQTT\n<topic>/status (retained, LWT)\n<topic>/heartbeat
+
+@enduml

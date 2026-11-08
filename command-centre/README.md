@@ -58,9 +58,9 @@ NAT, so they cannot reach a broker running in it.
 
 ### Joining the cell
 
-Connect this machine's Wi-Fi to the Pi's access point (`AP_SSID` in `server/pi.env`). The Pi
-gives it a fixed address, `192.168.50.2` / `cc.comcs.lan`, only if `COMMAND_CENTRE_MAC` in
-`server/pi.env` is this machine's Wi-Fi MAC (Windows: `getmac /v`, Linux: `ip link`). The
+Connect this machine's Wi-Fi to the Pi's access point (`AP_SSID` in `access-point/ap.env`). The Pi
+gives it an address by DHCP; once it has joined, add `cc.comcs.lan <that address>` (shown in the
+access point's device log) to `access-point/dns.txt`, and the name resolves within 2 s. The
 ESP32s (`mqtt_host` in `nodes/configs/*.h`) and the alert server use that name.
 
 | What      | Where                                          |
@@ -83,6 +83,7 @@ All messages use QoS 1. `<nodeId>` matches `node_id` in `nodes/configs/*.h` (for
 | `comcs/cell1/<nodeId>/status`  | ESP32         | `online` on connect, `offline` as LWT     | yes      |
 | `comcs/cell1/alerts`           | alert server  | Alert (see below)                         | no       |
 | `comcs/cell1/alert-server/status` | alert server | `online` / `offline` (LWT)              | yes      |
+| `comcs/cell1/alert-server/heartbeat` | alert server | Heartbeat JSON every 5 s (see below, QoS 0) | no |
 | `comcs/cell1/command-centre/status` | Node-RED | `online` / `offline` (birth/LWT)          | yes      |
 
 **Reading:** Smart Data Model `WeatherObserved` key-values, the same object as the UDP
@@ -108,6 +109,16 @@ display. `id` is used to discard duplicates.
 
 Suggested `subCategory` values: `temperatureDifferential`, `humidityDifferential`,
 `temperatureOutOfRange`, `humidityOutOfRange`.
+
+**Alert server heartbeat:** published every `--status-interval` seconds (default 5) while the
+alert server is connected. `lastReading` is `null` until the first reading arrives. The flow
+does not use it yet; the `status` topic alone drives the component table.
+
+```json
+{"status":"online","dateIssued":"2026-11-08T21:57:05Z","uptimeSeconds":125,"udpPort":8080,
+ "readingsReceived":42,"invalidDatagrams":0,"storageErrors":0,
+ "lastReading":{"nodeId":"esp32-001","secondsAgo":2}}
+```
 
 ## What the flow does
 

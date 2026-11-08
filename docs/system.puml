@@ -23,7 +23,7 @@ frame "Wi-Fi network comcs-cell1 (192.168.50.0/24)" as WLAN {
     queue "MQTT Broker\n(:1883)" as BROKER
   }
 
-  node "Alert Server - Raspberry Pi 5\n192.168.50.1 (comcs.lan)" as AS {
+  node "Alert Server - Raspberry Pi 5\n192.168.50.1 (as.comcs.lan)" as AS {
     component "Wi-Fi AP\n+ DHCP / DNS" as AP
     component "UDP server\n(0.0.0.0:8080)" as UDP
     database "readings.sqlite3" as DB
