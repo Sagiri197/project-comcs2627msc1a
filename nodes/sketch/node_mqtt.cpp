@@ -67,6 +67,10 @@ void mqttStart() {
     esp_mqtt_client_start(client);   // connects and reconnects in its own task
 }
 
+bool mqttIsConnected() {
+    return connected;
+}
+
 void mqttPublishReading(const std::string& json) {
     if (client == nullptr) {
         return;

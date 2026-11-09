@@ -12,6 +12,11 @@
 void mqttStart();
 
 /**
+ * @brief Return whether the MQTT client is currently connected to its broker.
+ */
+bool mqttIsConnected();
+
+/**
  * @brief Enqueue a non-retained QoS 1 reading on `comcs/cell1/<node_id>/weather`.
  * @param json Encoded protocol reading, shared with the UDP alert server.
  */

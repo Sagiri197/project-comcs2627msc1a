@@ -3,7 +3,7 @@
 #include "config_types.h"
 
 #ifndef NODE_PROFILE
-#define NODE_PROFILE 2
+#define NODE_PROFILE 3
 #endif
 
 #if NODE_PROFILE == 1

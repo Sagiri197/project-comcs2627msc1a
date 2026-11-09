@@ -33,6 +33,15 @@ struct Config {
     unsigned long time_sync_threshold_ms;
     unsigned long response_timeout_ms;
     unsigned long reading_delay_ms;
+    bool status_led_enabled = false;
+    std::uint8_t status_red_pin = 26;
+    std::uint8_t status_green_pin = 27;
+    std::uint8_t status_blue_pin = 14;
+    bool status_led_common_anode = false;
+    bool display_enabled = false;
+    std::uint8_t display_clk_pin = 18;
+    std::uint8_t display_dio_pin = 19;
+    std::uint8_t display_brightness = 2;
 };
 
 }
