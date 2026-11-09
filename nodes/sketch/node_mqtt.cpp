@@ -1,7 +1,7 @@
 #include "node_mqtt.h"
 
 #include <Arduino.h>
-#include <mqtt_client.h>   // ESP-IDF esp-mqtt, bundled with the ESP32 Arduino core
+#include <mqtt_client.h>
 
 #include "../config.h"
 
@@ -13,6 +13,11 @@ const std::string statusTopic  = std::string("comcs/cell1/") + node::config.node
 esp_mqtt_client_handle_t client = nullptr;
 volatile bool connected = false;
 
+/**
+ * @brief Handle MQTT connection, disconnection, publish acknowledgement, and errors.
+ * @param eventId ESP-IDF MQTT event identifier.
+ * @param eventData Pointer to the esp_mqtt_event_t supplied by ESP-IDF.
+ */
 void onMqttEvent(void*, esp_event_base_t, int32_t eventId, void* eventData) {
     auto event = static_cast<esp_mqtt_event_handle_t>(eventData);
     switch (static_cast<esp_mqtt_event_id_t>(eventId)) {

@@ -18,6 +18,11 @@ std::string sessionId;
 uint32_t sequenceNumber = 0;
 bool timeSynchronized = false;
 
+/**
+ * @brief Obtain the current UTC timestamp using the ESP32 system clock.
+ * @return Timestamp formatted as YYYY-MM-DDTHH:MM:SSZ, or an empty string if
+ * clock retrieval or formatting fails. Failures are logged to Serial.
+ */
 std::string currentTimestamp() {
     struct tm timeinfo{};
     if (!getLocalTime(&timeinfo, 5000)) { // Increased timeout to 5 seconds
@@ -34,6 +39,9 @@ std::string currentTimestamp() {
     return timestamp;
 }
 
+/**
+ * @brief Sample the sensor and send an encoded reading to MQTT and UDP.
+ */
 void sendReading() {
 
     if (sessionId.empty()) {
@@ -108,6 +116,9 @@ void sendReading() {
     }
 }
 
+/**
+ * @brief Initialize Serial, Wi-Fi, UTC time, the sensor, UDP, and MQTT.
+ */
 void setup() {
 
     Serial.begin(node::config.serial_baud);
@@ -138,6 +149,9 @@ void setup() {
     mqttStart();
 }
 
+/**
+ * @brief Send a reading, poll for UDP responses, and wait before the next cycle.
+ */
 void loop() {
 
     sendReading();

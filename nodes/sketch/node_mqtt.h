@@ -1,15 +1,18 @@
 #pragma once
 
-// MQTT link to the Command Centre.
-// Topics and payloads follow command-centre/README.md ("MQTT contract").
-// (Named node_mqtt.h to avoid clashing with ESP-IDF's <mqtt_client.h>.)
+/** @file node_mqtt.h
+ * @brief MQTT link to the Command Centre using the ESP-IDF esp-mqtt client.
+ */
 
 #include <string>
 
-// Starts the esp-mqtt client; it connects and reconnects in its own task.
+/**
+ * @brief Create and start the MQTT client using the configured broker and node ID.
+ */
 void mqttStart();
 
-// QoS 1 publish of a reading on comcs/cell1/<node_id>/weather. Enqueued in the client's
-// outbox, so it is sent (and retried until the broker's PUBACK) even if the broker is
-// briefly unreachable.
+/**
+ * @brief Enqueue a non-retained QoS 1 reading on `comcs/cell1/<node_id>/weather`.
+ * @param json Encoded protocol reading, shared with the UDP alert server.
+ */
 void mqttPublishReading(const std::string& json);

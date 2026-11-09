@@ -75,6 +75,10 @@ ctest --test-dir server/build --output-on-failure
 
 [https://sagiri197.github.io/project-comcs2627msc1a/](https://sagiri197.github.io/project-comcs2627msc1a/)
 
+A API inclui o servidor, o protocolo partilhado e o sketch ESP32: ciclo de vida,
+sensor DHT11, MQTT, UDP e tipos de configuracao. Os perfis com credenciais dos
+dispositivos e as bibliotecas externas ficam fora da documentacao.
+
 ```sh
 cmake -S server -B server/build
 cmake --build server/build --target doxygen

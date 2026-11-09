@@ -1,13 +1,15 @@
-PROJECT_NAME           = "COMICS Alert Server"
-PROJECT_BRIEF          = "Alert server and shared communication protocol"
+PROJECT_NAME           = "COMICS"
+PROJECT_BRIEF          = "Alert server, ESP32 firmware and shared communication protocol"
 OUTPUT_DIRECTORY       = doxygen
-INPUT                  = ../README.md ../common application daemon mqtt persistency udp
+INPUT                  = ../README.md ../common application daemon mqtt persistency udp ../nodes/sketch ../nodes/config_types.h
 RECURSIVE              = YES
-FILE_PATTERNS          = *.h *.cpp *.md
+FILE_PATTERNS          = *.h *.cpp *.ino *.md
+EXTENSION_MAPPING      = ino=C++
 EXCLUDE                = ../common/nlohmann
 EXCLUDE_PATTERNS       = */tests/* *_test.cpp
 USE_MDFILE_AS_MAINPAGE  = ../README.md
 EXTRACT_ALL            = YES
+EXTRACT_ANON_NSPACES    = YES
 GENERATE_HTML          = YES
 GENERATE_LATEX         = NO
 GENERATE_TREEVIEW      = YES
