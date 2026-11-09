@@ -71,7 +71,9 @@ ctest --test-dir server/build --output-on-failure
 ./server/build/bin/alert_server
 ```
 
-### Documentacao da API
+### Documentação
+
+[https://sagiri197.github.io/project-comcs2627msc1a/](https://sagiri197.github.io/project-comcs2627msc1a/)
 
 ```sh
 cmake -S server -B server/build
