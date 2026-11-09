@@ -75,10 +75,6 @@ ctest --test-dir server/build --output-on-failure
 
 [https://sagiri197.github.io/project-comcs2627msc1a/](https://sagiri197.github.io/project-comcs2627msc1a/)
 
-A API inclui o servidor, o protocolo partilhado e o sketch ESP32: ciclo de vida,
-sensor DHT11, MQTT, UDP e tipos de configuracao. Os perfis com credenciais dos
-dispositivos e as bibliotecas externas ficam fora da documentacao.
-
 ```sh
 cmake -S server -B server/build
 cmake --build server/build --target doxygen
@@ -90,13 +86,11 @@ cmake --build server/build --target doxygen
 
 Os valores especificos de cada dispositivo ficam em ficheiros separados:
 
-- `nodes/configs/esp32_001.h`: ID `esp32-001`, com a rede e posicao existentes.
-- `nodes/configs/esp32_002.h`: ID `esp32-002`.
-- `nodes/configs/esp32_003.h`: ID `esp32-003`.
+- `nodes/configs/esp32_G.h`: ID `esp32-001`, com a rede e posicao existentes.
+- `nodes/configs/esp32_P.h`: ID `esp32-002`.
+- `nodes/configs/esp32_T.h`: ID `esp32-003`.
 
 Antes de cada upload, escolher o dispositivo em `sketch/config.h`, alterando
 o valor por defeito de `NODE_PROFILE` para `1`, `2` ou `3`:
 
-### ESP32 esquemáticas
-
-![](./docs/images/esp32_controller.svg)
+### ESP32 esquemáticas![](./docs/images/esp32_controller.svg)
