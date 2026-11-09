@@ -18,7 +18,8 @@ inline constexpr StatusLedConfig statusLedConfig{
 inline constexpr DisplayConfig displayConfig{
     .clock_pin = 18,
     .data_pin = 17,
-    .brightness = 2
+    .brightness = 2,
+    .button_pin = 7
 };
 
 inline constexpr Config config{

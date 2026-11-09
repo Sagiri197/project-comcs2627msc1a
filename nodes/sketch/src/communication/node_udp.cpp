@@ -2,8 +2,8 @@
 
 #include <Arduino.h>
 
-#include "../../../../common/protocol.h"
-#include "../../../config.h"
+#include "../common/protocol.h"
+#include "../config.h"
 
 #include <variant>
 

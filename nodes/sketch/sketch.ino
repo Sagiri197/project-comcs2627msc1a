@@ -2,8 +2,8 @@
 #include <WiFi.h>
 #include <esp_system.h>
 
-#include "../../common/protocol.h"
-#include "../config.h"
+#include "src/common/protocol.h"
+#include "src/config.h"
 
 #include "src/hardware/node_dht.h"
 #include "src/hardware/node_display.h"
@@ -115,7 +115,7 @@ void sendReading() {
     }
     sensorError = false;
     if (display != nullptr) {
-        display->showTemperature(temperature);
+        display->showReadings(temperature, humidity);
     }
 
     const std::string timestamp = currentTimestamp();
@@ -231,10 +231,19 @@ void loop() {
 
         udp.receiveResponse(sessionId, sequenceNumber);
         updateStatusLed();
+        if (display != nullptr) {
+            display->update();
+        }
 
         delay(10);
     }
 
-    delay(node::config.reading_delay_ms);
+    start = millis();
+    while (millis() - start < node::config.reading_delay_ms) {
+        if (display != nullptr) {
+            display->update();
+        }
+        delay(10);
+    }
     updateStatusLed();
 }

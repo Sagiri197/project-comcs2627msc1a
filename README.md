@@ -86,13 +86,11 @@ cmake --build server/build --target doxygen
 
 Os valores especificos de cada dispositivo ficam em ficheiros separados:
 
-- `nodes/configs/esp32_001.h`: ID `esp32-001`, com a rede e posicao existentes.
-- `nodes/configs/esp32_002.h`: ID `esp32-002`.
-- `nodes/configs/esp32_003.h`: ID `esp32-003`.
+- `nodes/configs/esp32_G.h`: ID `esp32-001`, com a rede e posicao existentes.
+- `nodes/configs/esp32_P.h`: ID `esp32-002`.
+- `nodes/configs/esp32_T.h`: ID `esp32-003`.
 
 Antes de cada upload, escolher o dispositivo em `sketch/config.h`, alterando
 o valor por defeito de `NODE_PROFILE` para `1`, `2` ou `3`:
 
-### ESP32 esquemáticas
-
-![](./docs/images/esp32_controller.svg)
+### ESP32 esquemáticas![](./docs/images/esp32_controller.svg)

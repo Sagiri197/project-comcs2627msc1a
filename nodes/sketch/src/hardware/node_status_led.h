@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../../config_types.h"
+#include "../config_types.h"
 
 class StatusLed {
 public:

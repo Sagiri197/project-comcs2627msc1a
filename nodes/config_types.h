@@ -1,7 +1,7 @@
 #pragma once
 
-#if __has_include("src/common/protocol.h")
-#include "src/common/protocol.h"
+#if __has_include("common/protocol.h")
+#include "common/protocol.h"
 #else
 #include "../common/protocol.h"
 #endif
@@ -29,6 +29,7 @@ struct DisplayConfig {
     std::uint8_t clock_pin;
     std::uint8_t data_pin;
     std::uint8_t brightness;
+    int button_pin = -1;
 };
 
 /** @brief Compile-time device settings supplied by the selected node profile. */
