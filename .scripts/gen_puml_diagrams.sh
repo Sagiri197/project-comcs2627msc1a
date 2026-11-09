@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Render every .puml file under docs/ to a .png next to it.
+# Render every docs/diagrams/*.puml file to docs/images/.
 #
-# Usage: ./gen_puml_diagrams.sh
+# Usage: ./.scripts/gen_puml_diagrams.sh
 #
 # Uses the `plantuml` command when it is on PATH; otherwise runs
 # `java -jar "$PLANTUML_JAR"` (default: C:/Tools/PlantUML/plantuml.jar).
 set -euo pipefail
 
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/../docs/diagrams"
 
 if command -v plantuml >/dev/null 2>&1; then
     plantuml_cmd=(plantuml)
@@ -32,6 +32,6 @@ for f in "${files[@]}"; do
     echo "Rendering $f"
 done
 
-"${plantuml_cmd[@]}" -tpng -failfast2 "${files[@]}"
+"${plantuml_cmd[@]}" -tpng -failfast2 -o ../images "${files[@]}"
 
 echo "Done: ${#files[@]} diagram(s) rendered."

@@ -6,12 +6,17 @@ git submodule update --init --recursive
 
 ## Repositório
 
+- `/.scripts`: Scripts auxiliares
 - `/docs`: Documentação do projecto
 - `/common`: Protocolo partilhado entre nodes e servidor
 - `/nodes`: Sketches para correr nos ESP32s
 - `/server`: Servidor UDP de alerta (só o programa: código C++, build e testes)
 - `/access-point`: Rede Wi-Fi da célula (access point, DHCP/DNS, NTP): `linux/` para o Raspberry Pi, `windows/` para testar num portátil
 - `/command-centre`: Broker MQTT e Node-RED
+
+## Contexto
+
+![](docs/images/system.png)
 
 ## Arrancar tudo
 
@@ -27,9 +32,13 @@ git submodule update --init --recursive
    ```sh
    server\build\bin\Release\alert_server.exe  # Linux: server/build/bin/alert_server
    ```
-4. Flash e monitor de cada ESP32 (uma por terminal):
+4. a. Flash e monitor de cada ESP32 (uma por terminal):
    ```sh
    make -C nodes flash-monitor NODE=1         # NODE=2, NODE=3
+   ```
+   b. Flashar todos os ESP32s (Requere makefile configurado com portos) de uma vez:
+   ```sh
+   make -C nodes flash
    ```
 
 ## Build e testagem
@@ -42,9 +51,6 @@ ctest --test-dir server/build --output-on-failure
 ```
 
 ## Buildar sketch ESP32
-
-Criar uma pasta `sketch`, copiar os conteudos de `nodes` para lá, e
-copiar commons `common` para `sketch/src/common`:
 
 ### Configuracao de cada ESP32
 
@@ -59,4 +65,4 @@ o valor por defeito de `NODE_PROFILE` para `1`, `2` ou `3`:
 
 ### ESP32 esquemáticas
 
-![](./docs/esp32_controller.svg)
+![](./docs/images/esp32_controller.svg)

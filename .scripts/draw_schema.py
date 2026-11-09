@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import schemdraw
 import schemdraw.elements as elm
 
@@ -97,5 +99,7 @@ with schemdraw.Drawing(show=False) as d:
     wire((bx, -16), (bx - 1.5, -16)); gnd((bx - 1.5, -16))
 
     label((TX + 3, BOX_Y1 + 2), "ESP32 controller", fontsize=14)
-    d.save("esp32_controller.svg")
-print("saved esp32_controller.svg")
+    output_path = Path(__file__).resolve().parents[1] / "docs" / "images" / "esp32_controller.svg"
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    d.save(str(output_path))
+print(f"saved {output_path}")
