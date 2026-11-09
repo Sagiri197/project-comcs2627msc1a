@@ -1,9 +1,5 @@
 #pragma once
 
-/** @file node_dht.h
- * @brief DHT11 temperature and humidity acquisition for the configured node.
- */
-
 /** @brief Initialize the DHT11 sensor on node::Config::dht_pin. */
 void dhtBegin();
 
