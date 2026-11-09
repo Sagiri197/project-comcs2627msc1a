@@ -30,7 +30,7 @@ git submodule update --init --recursive
 
 - [DHT sensor library](https://github.com/adafruit/DHT-sensor-library)
 - [Adafruit Unified Sensor](https://github.com/adafruit/Adafruit_Sensor)
-- [Gotek LEDC68](https://github.com/gotek/GotekLEDC68)
+- [Gotek LEDC68](https://github.com/coopzone-dc/GotekLEDC68)
 
 ### Command Centre
 - [Docker](https://www.docker.com/) (para correr o broker MQTT e Node-RED)

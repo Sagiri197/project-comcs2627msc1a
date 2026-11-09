@@ -10,3 +10,6 @@
 [submodule "server/vendor/mosquitto"]
 	path = server/vendor/mosquitto
 	url = https://github.com/eclipse-mosquitto/mosquitto.git
+[submodule "nodes/vendor/GotekLEDC68"]
+	path = nodes/vendor/GotekLEDC68
+	url = https://github.com/coopzone-dc/GotekLEDC68.git
