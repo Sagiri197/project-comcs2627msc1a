@@ -1,0 +1,15 @@
+PROJECT_NAME           = "COMICS Alert Server"
+PROJECT_BRIEF          = "Alert server and shared communication protocol"
+OUTPUT_DIRECTORY       = doxygen
+INPUT                  = ../README.md ../common application daemon mqtt persistency udp
+RECURSIVE              = YES
+FILE_PATTERNS          = *.h *.cpp *.md
+EXCLUDE                = ../common/nlohmann
+EXCLUDE_PATTERNS       = */tests/* *_test.cpp
+USE_MDFILE_AS_MAINPAGE  = ../README.md
+EXTRACT_ALL            = YES
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_TREEVIEW      = YES
+HAVE_DOT               = NO
+QUIET                  = YES

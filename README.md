@@ -14,6 +14,27 @@ git submodule update --init --recursive
 - `/access-point`: Rede Wi-Fi da célula (access point, DHCP/DNS, NTP): `linux/` para o Raspberry Pi, `windows/` para testar num portátil
 - `/command-centre`: Broker MQTT e Node-RED
 
+## Dependências
+
+### Servidor UDP
+
+- [CMake](https://cmake.org/)
+- [spdlog](https://github.com/gabime/spdlog)
+- [Eclipse Mosquitto/libmosquitto](https://github.com/eclipse-mosquitto/mosquitto)
+- [SQLite](https://github.com/azadkuh/sqlite-amalgamation)
+- [GoogleTest](https://github.com/google/googletest) (testes)
+- [nlohmann/json](https://github.com/nlohmann/json)
+- [Doxygen](https://www.doxygen.nl/) (opcional)
+
+### Firmware ESP32
+
+- [DHT sensor library](https://github.com/adafruit/DHT-sensor-library)
+- [Adafruit Unified Sensor](https://github.com/adafruit/Adafruit_Sensor)
+- [Gotek LEDC68](https://github.com/gotek/GotekLEDC68)
+
+### Command Centre
+- [Docker](https://www.docker.com/) (para correr o broker MQTT e Node-RED)
+
 ## Contexto
 
 ![](docs/images/system.png)
@@ -48,6 +69,13 @@ cmake -S server -B server/build -DBUILD_TESTING=ON
 cmake --build server/build -j2
 ctest --test-dir server/build --output-on-failure
 ./server/build/bin/alert_server
+```
+
+### Documentacao da API
+
+```sh
+cmake -S server -B server/build
+cmake --build server/build --target doxygen
 ```
 
 ## Buildar sketch ESP32
