@@ -13,63 +13,65 @@ command-centre/
     └── flows.json        the command-centre flow (commit changes made in the editor)
 ```
 
-## Run (Ubuntu / WSL)
+## Run
 
-Needs Docker: either Docker Desktop with WSL integration enabled for the distro, or
-`sudo apt install docker.io docker-compose-v2`. Keep the repo on the Linux filesystem
-(`~/...`), not under `/mnt/c`.
+The Command Centre always runs with Docker Compose, directly on the Windows or Linux machine
+that joins the cell's Wi-Fi. **Do not run it inside WSL:** the ESP32s and the alert server
+connect to the broker at this machine's address (`cc.comcs.lan`), and WSL2 sits behind its own
+NAT, so they cannot reach a broker running in it.
 
-```bash
-cd command-centre
-docker compose up -d --build
-docker compose logs -f nodered     # "Connected to broker: comcs-command-centre@mqtt://mosquitto:1883"
-```
+### Windows
 
-| What      | Where                                 |
-|-----------|---------------------------------------|
-| Editor    | http://localhost:1880                 |
-| Dashboard | http://localhost:1880/dashboard       |
-| Broker    | `<host IP>:1883` (no authentication)  |
+1. Install **Docker Desktop** and start it. Its WSL 2 backend is fine: Docker Desktop publishes
+   container ports on the Windows host. Docker Engine installed inside a WSL distro is not.
+2. Allow the ports through Windows Firewall (PowerShell as administrator):
+   ```powershell
+   New-NetFirewallRule -DisplayName "COMCS MQTT 1883" -Direction Inbound -Protocol TCP -LocalPort 1883 -Action Allow
+   New-NetFirewallRule -DisplayName "COMCS Node-RED 1880" -Direction Inbound -Protocol TCP -LocalPort 1880 -Action Allow
+   ```
+3. Nothing else may listen on port 1883. If Mosquitto for Windows is installed, stop it
+   (as administrator): `Stop-Service mosquitto; Set-Service mosquitto -StartupType Disabled`.
+4. Start the stack from PowerShell:
+   ```powershell
+   cd command-centre
+   docker compose up -d --build
+   docker compose logs -f nodered     # "Connected to broker: comcs-command-centre@mqtt://mosquitto:1883"
+   ```
+
+### Linux
+
+1. Install Docker Engine and the Compose plugin, and allow your user to use it:
+   ```bash
+   sudo apt install -y docker.io docker-compose-v2
+   sudo usermod -aG docker "$USER"    # log out and back in afterwards
+   ```
+2. If a firewall is enabled, open the ports: `sudo ufw allow 1883/tcp && sudo ufw allow 1880/tcp`.
+3. Nothing else may listen on port 1883: `sudo systemctl disable --now mosquitto` if it is installed.
+4. Start the stack:
+   ```bash
+   cd command-centre
+   docker compose up -d --build
+   docker compose logs -f nodered     # "Connected to broker: comcs-command-centre@mqtt://mosquitto:1883"
+   ```
+   Node-RED inside the container runs as uid 1000. If it cannot write `flows.json`, run
+   `sudo chown -R 1000:1000 nodered`.
+
+### Joining the cell
+
+Connect this machine's Wi-Fi to the Pi's access point (`AP_SSID` in `access-point/ap.env`). The Pi
+gives it an address by DHCP; once it has joined, add `cc.comcs.lan <that address>` (shown in the
+access point's device log) to `access-point/dns.txt`, and the name resolves within 2 s. The
+ESP32s (`mqtt_host` in `nodes/configs/*.h`) and the alert server use that name.
+
+| What      | Where                                          |
+|-----------|------------------------------------------------|
+| Editor    | http://localhost:1880                          |
+| Dashboard | http://localhost:1880/dashboard                |
+| Broker    | `cc.comcs.lan:1883` (no authentication)        |
 
 Stop with `docker compose down`. Retained status messages and QoS 1 sessions are stored in
-the `mosquitto-data` volume, so they survive restarts.
-
-Node-RED inside the container runs as uid 1000. If it cannot write `flows.json`, run
-`sudo chown -R 1000:1000 nodered`.
-
-### Making the broker reachable from the ESP32s
-
-By default WSL2 is behind NAT, so devices on the Wi-Fi can't reach port 1883 inside WSL.
-- **Docker Desktop:** published ports are already exposed on the Windows host IP.
-- **Docker Engine inside WSL:** enable mirrored networking in `%UserProfile%\.wslconfig`
-  (`[wsl2]` then `networkingMode=mirrored`) and run `wsl --shutdown`. The alternative is
-  `netsh interface portproxy add v4tov4 listenport=1883 connectport=1883 connectaddress=<WSL IP>`.
-- In both cases, allow inbound TCP 1883 in Windows Firewall. The ESP32s use the
-  **Windows** LAN IP (`ipconfig`).
-
-### Without Docker (Ubuntu / WSL)
-
-Node-RED 5 needs **Node.js 22.9 or newer**, and Ubuntu's `apt install nodejs` is too old. Use nvm:
-
-```bash
-# 1. Node.js
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
-source ~/.bashrc
-nvm install 22 && node -v
-
-# 2. Mosquitto broker. Ubuntu's default config only listens on localhost, so open it to the LAN
-sudo apt update && sudo apt install -y mosquitto mosquitto-clients
-printf 'listener 1883 0.0.0.0\nallow_anonymous true\n' | sudo tee /etc/mosquitto/conf.d/comcs.conf
-sudo service mosquitto restart        # or: sudo systemctl enable --now mosquitto
-
-# 3. Node-RED + dashboard, installed locally in command-centre/nodered (git-ignored)
-cd command-centre/nodered
-npm install --no-audit --no-fund node-red@5.0.8 @flowfuse/node-red-dashboard@1.34.0
-npx node-red --userDir .              # MQTT_HOST defaults to localhost
-```
-
-The editor and dashboard URLs are the same as above. Stop Node-RED with Ctrl+C. Retained
-messages are persisted by Ubuntu's default `/etc/mosquitto/mosquitto.conf` in `/var/lib/mosquitto`.
+the `mosquitto-data` volume, so they survive restarts. Node-RED takes ~30 s to start; the
+editor returns an empty response until then.
 
 ## MQTT contract
 
@@ -81,6 +83,7 @@ All messages use QoS 1. `<nodeId>` matches `node_id` in `nodes/configs/*.h` (for
 | `comcs/cell1/<nodeId>/status`  | ESP32         | `online` on connect, `offline` as LWT     | yes      |
 | `comcs/cell1/alerts`           | alert server  | Alert (see below)                         | no       |
 | `comcs/cell1/alert-server/status` | alert server | `online` / `offline` (LWT)              | yes      |
+| `comcs/cell1/alert-server/heartbeat` | alert server | Heartbeat JSON every 5 s (see below, QoS 0) | no |
 | `comcs/cell1/command-centre/status` | Node-RED | `online` / `offline` (birth/LWT)          | yes      |
 
 **Reading:** Smart Data Model `WeatherObserved` key-values, the same object as the UDP
@@ -107,6 +110,16 @@ display. `id` is used to discard duplicates.
 Suggested `subCategory` values: `temperatureDifferential`, `humidityDifferential`,
 `temperatureOutOfRange`, `humidityOutOfRange`.
 
+**Alert server heartbeat:** published every `--status-interval` seconds (default 5) while the
+alert server is connected. `lastReading` is `null` until the first reading arrives. The flow
+does not use it yet; the `status` topic alone drives the component table.
+
+```json
+{"status":"online","dateIssued":"2026-11-08T21:57:05Z","uptimeSeconds":125,"udpPort":8080,
+ "readingsReceived":42,"invalidDatagrams":0,"storageErrors":0,
+ "lastReading":{"nodeId":"esp32-001","secondsAgo":2}}
+```
+
 ## What the flow does
 
 - **Validation:** checks the `WeatherObserved` type, URN, numeric ranges and timestamp.
@@ -130,9 +143,12 @@ the `EXPECTED_COMPONENTS` environment variable.
 
 The **Simulator** tab publishes to the broker: one reading per node, a continuous 1 s
 stream (enable the disabled `every 1 s` inject), an alert, LWT offline/online, a 2-minute-old
-buffered reading and an invalid reading. From the command line:
+buffered reading and an invalid reading. From the command line (the MQTT clients come with the
+broker container, so nothing needs installing on the host):
 
 ```bash
-mosquitto_sub -h localhost -t 'comcs/#' -v
-mosquitto_pub -h localhost -q 1 -t comcs/cell1/alerts -m '{"description":"test alert","severity":"low"}'
+docker exec comcs-mosquitto mosquitto_sub -t 'comcs/#' -v
+docker exec comcs-mosquitto mosquitto_pub -q 1 -t comcs/cell1/alerts -m '{"description":"test alert","severity":"low"}'
+docker exec comcs-mosquitto mosquitto_sub -t '$SYS/broker/clients/#' -v   # broker statistics
+docker compose logs -f mosquitto                                         # clients connecting/disconnecting
 ```

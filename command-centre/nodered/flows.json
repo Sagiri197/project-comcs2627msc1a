@@ -587,11 +587,32 @@
         ]
     },
     {
+        "id": "in_server_heartbeat",
+        "type": "mqtt in",
+        "z": "tab_cc",
+        "name": "alert-server heartbeat",
+        "topic": "comcs/cell1/alert-server/heartbeat",
+        "qos": "1",
+        "datatype": "json",
+        "broker": "broker",
+        "nl": false,
+        "rap": true,
+        "rh": 0,
+        "inputs": 0,
+        "x": 150,
+        "y": 500,
+        "wires": [
+            [
+                "f_health"
+            ]
+        ]
+    },
+    {
         "id": "f_health",
         "type": "function",
         "z": "tab_cc",
         "name": "Component health",
-        "func": "    // Combines MQTT Last-Will status (\"online\"/\"offline\", retained) with a data\n// watchdog: a sensor node that is \"online\" but silent for STALE_MS is STALE.\nconst STALE_MS = 5000;\nconst EXPECTED = env.get('EXPECTED_COMPONENTS') || 'esp32-001,esp32-002,alert-server';\nconst comps = context.get('comps') || {};\nconst now = Date.now();\nconst get = (id) => (comps[id] = comps[id] || { connection: 'unknown', lastData: 0, state: '' });\n\nEXPECTED.split(',').map((s) => s.trim()).filter(Boolean).forEach(get);\n\nif (msg.topic === 'tick') {\n    // fall through to evaluation\n} else if (msg.topic.endsWith('/status')) {\n    const id = msg.topic.split('/')[2];\n    if (id === 'command-centre') return null;\n    get(id).connection = String(msg.payload).trim().toLowerCase() === 'online' ? 'online' : 'offline';\n} else if (msg.payload && msg.payload.nodeId) {\n    get(msg.payload.nodeId).lastData = msg.payload.receivedAt;\n    if (msg.payload.live && get(msg.payload.nodeId).connection === 'unknown') {\n        get(msg.payload.nodeId).connection = 'online';\n    }\n}\n\nconst notifications = [];\nconst rows = Object.keys(comps).sort().map((id) => {\n    const c = comps[id];\n    const isSensor = id !== 'alert-server';\n    const age = c.lastData ? now - c.lastData : null;\n    let state = 'OK';\n    if (c.connection === 'offline') state = 'OFFLINE';\n    else if (isSensor && (age === null || age > STALE_MS)) state = c.lastData ? 'STALE' : 'NO DATA';\n    else if (c.connection === 'unknown') state = 'UNKNOWN';\n    if (c.state && c.state !== state && (state === 'OFFLINE' || state === 'STALE' || c.state === 'OFFLINE' || c.state === 'STALE')) {\n        notifications.push({ payload: `${id}: ${c.state} → ${state}` });\n    }\n    c.state = state;\n    return {\n        Component: id,\n        Connection: c.connection,\n        'Last data': isSensor ? (age === null ? '—' : `${Math.round(age / 1000)} s ago`) : 'n/a',\n        State: state\n    };\n});\ncontext.set('comps', comps);\n\nconst bad = rows.filter((r) => r.State !== 'OK').length;\nnode.status({ fill: bad ? 'red' : 'green', shape: 'dot', text: bad ? `${bad} component(s) degraded` : 'all OK' });\nreturn [{ payload: rows }, notifications.length ? notifications : null];",
+        "func": "    // Combines MQTT Last-Will status (\"online\"/\"offline\", retained) with a data\n// watchdog: a sensor node that is \"online\" but silent for STALE_MS is STALE.\nconst STALE_MS = 5000;\n// The alert-server heartbeat is published every 5 s (--status-interval); allow a few misses.\nconst SERVER_STALE_MS = 15000;\nconst EXPECTED = env.get('EXPECTED_COMPONENTS') || 'esp32-001,esp32-002,alert-server';\nconst comps = context.get('comps') || {};\nconst now = Date.now();\nconst get = (id) => (comps[id] = comps[id] || { connection: 'unknown', lastData: 0, state: '' });\n\nEXPECTED.split(',').map((s) => s.trim()).filter(Boolean).forEach(get);\n\nif (msg.topic === 'tick') {\n    // fall through to evaluation\n} else if (msg.topic.endsWith('/heartbeat')) {\n    // alert-server heartbeat: its \"last data\" is the time of the last heartbeat\n    const id = msg.topic.split('/')[2];\n    get(id).lastData = now;\n    if (get(id).connection === 'unknown') get(id).connection = 'online';\n} else if (msg.topic.endsWith('/status')) {\n    const id = msg.topic.split('/')[2];\n    if (id === 'command-centre') return null;\n    get(id).connection = String(msg.payload).trim().toLowerCase() === 'online' ? 'online' : 'offline';\n} else if (msg.payload && msg.payload.nodeId) {\n    get(msg.payload.nodeId).lastData = msg.payload.receivedAt;\n    if (msg.payload.live && get(msg.payload.nodeId).connection === 'unknown') {\n        get(msg.payload.nodeId).connection = 'online';\n    }\n}\n\nconst notifications = [];\nconst rows = Object.keys(comps).sort().map((id) => {\n    const c = comps[id];\n    const isSensor = id !== 'alert-server';\n    const staleMs = isSensor ? STALE_MS : SERVER_STALE_MS;\n    const age = c.lastData ? now - c.lastData : null;\n    let state = 'OK';\n    if (c.connection === 'offline') state = 'OFFLINE';\n    else if (age === null || age > staleMs) state = c.lastData ? 'STALE' : 'NO DATA';\n    else if (c.connection === 'unknown') state = 'UNKNOWN';\n    if (c.state && c.state !== state && (state === 'OFFLINE' || state === 'STALE' || c.state === 'OFFLINE' || c.state === 'STALE')) {\n        notifications.push({ payload: `${id}: ${c.state} → ${state}` });\n    }\n    c.state = state;\n    return {\n        Component: id,\n        Connection: c.connection,\n        'Last data': age === null ? '—' : `${Math.round(age / 1000)} s ago`,\n        State: state\n    };\n});\ncontext.set('comps', comps);\n\nconst bad = rows.filter((r) => r.State !== 'OK').length;\nnode.status({ fill: bad ? 'red' : 'green', shape: 'dot', text: bad ? `${bad} component(s) degraded` : 'all OK' });\nreturn [{ payload: rows }, notifications.length ? notifications : null];",
         "outputs": 2,
         "timeout": 0,
         "noerr": 0,

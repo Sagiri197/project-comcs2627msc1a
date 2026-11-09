@@ -3,6 +3,12 @@
 #include <spdlog/spdlog.h>
 #include <cmath>
 
+namespace {
+// The protocol carries relativeHumidity as an NGSI-LD fraction (0..1);
+// the alert thresholds and logs are expressed in percent.
+double toPercent(double fraction) { return fraction * 100.0; }
+}  // namespace
+
 AlertLogic::AlertLogic(ReadingStore& store)
     : m_store(store), m_last_reading_time(std::chrono::system_clock::now()) {}
 
@@ -35,9 +41,11 @@ AlertLogic::ComparisonResult AlertLogic::compareWithLast(
     
     const auto& cp = current.payload;
     const auto& lp = last.payload;
+    const double cur_hum = toPercent(cp.relative_humidity);
+    const double last_hum = toPercent(lp.relative_humidity);
     
     double temp_diff = std::abs(cp.temperature - lp.temperature);
-    double humidity_diff = std::abs(cp.relative_humidity - lp.relative_humidity);
+    double humidity_diff = std::abs(cur_hum - last_hum);
     
     auto time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::system_clock::now() - m_last_reading_time
@@ -48,8 +56,8 @@ AlertLogic::ComparisonResult AlertLogic::compareWithLast(
     bool last_temp_valid = lp.temperature >= TEMPERATURE_MIN && lp.temperature <= TEMPERATURE_MAX;
     bool out_of_temp_range = !current_temp_valid || !last_temp_valid;
     
-    bool current_hum_valid = cp.relative_humidity >= HUMIDITY_MIN && cp.relative_humidity <= HUMIDITY_MAX;
-    bool last_hum_valid = lp.relative_humidity >= HUMIDITY_MIN && lp.relative_humidity <= HUMIDITY_MAX;
+    bool current_hum_valid = cur_hum >= HUMIDITY_MIN && cur_hum <= HUMIDITY_MAX;
+    bool last_hum_valid = last_hum >= HUMIDITY_MIN && last_hum <= HUMIDITY_MAX;
     bool out_of_humidity_range = !current_hum_valid || !last_hum_valid;
     
     return {
@@ -72,7 +80,8 @@ void AlertLogic::logReading(const common::protocol::Reading& reading) const {
     spdlog::info("Session: {}", identity.session_id);
     spdlog::info("Sequence: {}", identity.seq);
     spdlog::info("Temperature: {:.2f}°C", payload.temperature);
-    spdlog::info("Humidity: {:.2f}%", payload.relative_humidity);
+    spdlog::info("Humidity: {:.2f}%", toPercent(payload.relative_humidity));
+    spdlog::info("============================");
 }
 
 inline void AlertLogic::logAlert(const ComparisonResult& result,
@@ -88,10 +97,10 @@ inline void AlertLogic::logAlert(const ComparisonResult& result,
     }
     
     spdlog::warn("ALERT");
-    spdlog::warn("\tPrevious: {} ({}°C, {}%)", 
-                 last.identity.node_id, last.payload.temperature, last.payload.relative_humidity);
-    spdlog::warn("\tCurrent:  {} ({}°C, {}%)", 
-                 current.identity.node_id, current.payload.temperature, current.payload.relative_humidity);
+    spdlog::warn("  Previous: {} ({:.2f}°C, {:.2f}%)", 
+                 last.identity.node_id, last.payload.temperature, toPercent(last.payload.relative_humidity));
+    spdlog::warn("  Current:  {} ({:.2f}°C, {:.2f}%)", 
+                 current.identity.node_id, current.payload.temperature, toPercent(current.payload.relative_humidity));
     
     if (result.exceeds_temp_threshold) 
         spdlog::warn("\tTemperature differential {:.2f}°C EXCEEDS threshold {:.2f}°C", result.temperature_diff, TEMPERATURE_THRESHOLD);

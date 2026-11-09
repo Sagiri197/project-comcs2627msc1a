@@ -2,6 +2,7 @@
 
 # Server gitignore
 server/build/   
+server/build-windows/
 server/doxygen/
 server/logs/
 *.sqlite3
@@ -23,5 +24,6 @@ command-centre/nodered/node_modules/
 command-centre/nodered/lib/
 command-centre/nodered/context/
 
-# Raspberry Pi local overrides (passwords)
-server/pi.env.local
+# Local overrides (passwords)
+access-point/ap.env.local
+

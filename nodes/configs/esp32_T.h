@@ -12,6 +12,8 @@ inline constexpr Config config{
     .server_address = "172.19.96.45",
     .server_port = 8080,
     .local_port = 4210,
+    .mqtt_host = "cc.comcs.lan",
+    .mqtt_port = 1883,
     .dht_pin = 21,
     .longitude = -8.620,
     .latitude = 41.160,

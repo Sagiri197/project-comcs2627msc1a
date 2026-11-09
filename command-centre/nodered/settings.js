@@ -1,7 +1,7 @@
 // Minimal Node-RED settings for the COMCS command centre.
-// The MQTT broker host/port are read from the environment so the same flow works
-// inside docker compose (MQTT_HOST=mosquitto) and natively (default localhost).
-process.env.MQTT_HOST = process.env.MQTT_HOST || 'localhost';
+// Runs only inside docker compose. The MQTT broker host/port come from the environment
+// (docker-compose.yml); the defaults are the compose service name and port.
+process.env.MQTT_HOST = process.env.MQTT_HOST || 'mosquitto';
 process.env.MQTT_PORT = process.env.MQTT_PORT || '1883';
 
 module.exports = {

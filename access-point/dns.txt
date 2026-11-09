@@ -1,0 +1,11 @@
+# DNS names for the Pi's access point (access-point/linux/access-point.sh), reloaded on save.
+# hostname ipAddress
+# Add the Command Centre once it has joined, with the address shown in the device log, e.g.
+# cc.comcs.lan 192.168.50.87
+as.comcs.lan 192.168.50.1
+pool.ntp.org 192.168.50.1
+time.google.com 192.168.50.1
+time.nist.gov 192.168.50.1
+time.windows.com 192.168.50.1
+time.cloudflare.com 192.168.50.1
+ntp.ubuntu.com 192.168.50.1

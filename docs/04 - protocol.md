@@ -12,7 +12,8 @@ Public types do not depend on a JSON library or server infrastructure.
 The `alert_server_core` CMake target provides `AlertServer` from
 `server/daemon/include/alert_server.h`. Its constructor takes a `ReadingStore&`
 that must outlive the server, and an endpoint (default: `0.0.0.0:8080`). It owns
-the underlying `UdpSocket`.
+the underlying `IUdpSocket` (`PosixUdpSocket` or `WindowsUdpSocket`, created by
+`make_udp_socket()`); another implementation can be passed to the constructor instead.
 `send(message, destination)` validates and encodes a message before sending it.
 Blocking `receive()` returns an `AlertServer::ReceivedMessage` containing a typed `message`
 and the original `sender` endpoint, which can be passed directly to `send`.

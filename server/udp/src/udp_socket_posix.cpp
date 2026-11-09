@@ -1,4 +1,4 @@
-#include "udp_socket.h"
+#include "udp_socket_posix.h"
 
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -33,7 +33,7 @@ UdpEndpoint endpoint_from(const sockaddr_in& address) {
 }
 }
 
-UdpSocket::UdpSocket(const UdpEndpoint& endpoint) : m_descriptor(-1) {
+PosixUdpSocket::PosixUdpSocket(const UdpEndpoint& endpoint) : m_descriptor(-1) {
     
     const auto address = socket_address(endpoint);
     m_descriptor = socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0);
@@ -47,11 +47,11 @@ UdpSocket::UdpSocket(const UdpEndpoint& endpoint) : m_descriptor(-1) {
     }
 }
 
-UdpSocket::~UdpSocket() {
+PosixUdpSocket::~PosixUdpSocket() {
     close(m_descriptor);
 }
 
-void UdpSocket::send(std::string_view data, const UdpEndpoint& destination) const {
+void PosixUdpSocket::send(std::string_view data, const UdpEndpoint& destination) const {
     
     const auto address = socket_address(destination);
     if (sendto(m_descriptor, data.data(), data.size(), 0,
@@ -60,7 +60,7 @@ void UdpSocket::send(std::string_view data, const UdpEndpoint& destination) cons
     }
 }
 
-UdpDatagram UdpSocket::recv() const {
+UdpDatagram PosixUdpSocket::recv() const {
     
     UdpDatagram datagram{std::string(PACKET_SIZE, 0), {}};
     sockaddr_in sender{};
@@ -77,4 +77,8 @@ UdpDatagram UdpSocket::recv() const {
     datagram.sender = endpoint_from(sender);
     
     return datagram;
+}
+
+std::unique_ptr<IUdpSocket> make_udp_socket(const UdpEndpoint& endpoint) {
+    return std::make_unique<PosixUdpSocket>(endpoint);
 }

@@ -1,10 +1,16 @@
 #include "alert_server.h"
 
+#include <stdexcept>
 #include <utility>
 #include <spdlog/spdlog.h>
 
 AlertServer::AlertServer(ReadingStore& store, AlertLogic& logic, const UdpEndpoint& endpoint)
-    : m_socket(endpoint), m_store(store), m_logic(logic) {}
+    : AlertServer(store, logic, make_udp_socket(endpoint)) {}
+
+AlertServer::AlertServer(ReadingStore& store, AlertLogic& logic, std::unique_ptr<IUdpSocket> socket)
+    : m_socket(std::move(socket)), m_store(store), m_logic(logic) {
+    if (!m_socket) throw std::invalid_argument("AlertServer needs a socket");
+}
 
 AlertServer::ReceivedMessage AlertServer::receive() {
 
@@ -50,6 +56,6 @@ AlertServer::ReceivedMessage AlertServer::receive() {
 
 void AlertServer::send(const common::protocol::Message& message,
                        const UdpEndpoint& destination) const {
-    m_socket.send(common::protocol::encode(message), destination);
+    m_socket->send(common::protocol::encode(message), destination);
 }
 

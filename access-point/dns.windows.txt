@@ -1,0 +1,10 @@
+# DNS names for the Windows hotspot (access-point\windows\access-point.ps1), reloaded on save.
+# hostname ipAddress   - Windows' hotspot is 192.168.137.1; the laptop is both servers.
+# Keep time.windows.com out: the laptop syncs its own clock from it.
+as.comcs.lan 192.168.137.1
+cc.comcs.lan 192.168.137.1
+pool.ntp.org 192.168.137.1
+time.google.com 192.168.137.1
+time.nist.gov 192.168.137.1
+time.cloudflare.com 192.168.137.1
+ntp.ubuntu.com 192.168.137.1

@@ -30,6 +30,12 @@ endif()
 
 add_subdirectory(vendor)
 
+# The unit tests use POSIX sockets/unistd directly; the server itself builds on Windows.
+if(WIN32 AND BUILD_TESTING)
+    message(STATUS "Unit tests are POSIX-only: skipped on Windows")
+    set(BUILD_TESTING OFF)
+endif()
+
 if(BUILD_TESTING)
     if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/vendor/googletest/CMakeLists.txt")
         message(FATAL_ERROR "GoogleTest submodule is missing")
@@ -41,6 +47,7 @@ endif()
 
 add_subdirectory(../common "${CMAKE_CURRENT_BINARY_DIR}/common")
 add_subdirectory(udp)
+add_subdirectory(mqtt)
 add_subdirectory(persistency)
 add_subdirectory(application)
 add_subdirectory(daemon)
