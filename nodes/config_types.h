@@ -14,6 +14,23 @@ enum class Hardware {
     Esp32S3 ///< ESP32-S3 board.
 };
 
+struct DhtConfig {
+    std::uint8_t data_pin;
+};
+
+struct StatusLedConfig {
+    std::uint8_t red_pin;
+    std::uint8_t green_pin;
+    std::uint8_t blue_pin;
+    bool common_anode;
+};
+
+struct DisplayConfig {
+    std::uint8_t clock_pin;
+    std::uint8_t data_pin;
+    std::uint8_t brightness;
+};
+
 /** @brief Compile-time device settings supplied by the selected node profile. */
 struct Config {
     Hardware hardware;
@@ -25,7 +42,7 @@ struct Config {
     std::uint16_t local_port;
     const char* mqtt_host;      // Command Centre broker (cc.comcs.lan on the Pi's AP)
     std::uint16_t mqtt_port;
-    std::uint8_t dht_pin;
+    const DhtConfig* dht = nullptr;
     double longitude;
     double latitude;
     common::protocol::Qos qos;
@@ -33,15 +50,8 @@ struct Config {
     unsigned long time_sync_threshold_ms;
     unsigned long response_timeout_ms;
     unsigned long reading_delay_ms;
-    bool status_led_enabled = false;
-    std::uint8_t status_red_pin = 26;
-    std::uint8_t status_green_pin = 27;
-    std::uint8_t status_blue_pin = 14;
-    bool status_led_common_anode = false;
-    bool display_enabled = false;
-    std::uint8_t display_clk_pin = 18;
-    std::uint8_t display_dio_pin = 19;
-    std::uint8_t display_brightness = 2;
+    const StatusLedConfig* status_led = nullptr;
+    const DisplayConfig* display = nullptr;
 };
 
 }

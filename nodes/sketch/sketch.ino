@@ -5,11 +5,11 @@
 #include "../../common/protocol.h"
 #include "../config.h"
 
-#include "node_dht.h"
-#include "node_mqtt.h"
-#include "node_udp.h"
-
-#include "../vendor/GotekLEDC68/TM1651.h"
+#include "src/hardware/node_dht.h"
+#include "src/hardware/node_display.h"
+#include "src/hardware/node_status_led.h"
+#include "src/communication/node_mqtt.h"
+#include "src/communication/node_udp.h"
 
 #include <string>
 #include <cmath>
@@ -20,73 +20,53 @@ using namespace common::protocol;
 std::string sessionId;
 uint32_t sequenceNumber = 0;
 bool timeSynchronized = false;
-TM1651* statusDisplay = nullptr;
 bool sensorError = false;
 bool transmissionError = false;
 
-void setStatusLed(bool red, bool green, bool blue) {
-    if (!node::config.status_led_enabled) {
-        return;
-    }
-    const bool inverted = node::config.status_led_common_anode;
-    digitalWrite(node::config.status_red_pin, red != inverted ? HIGH : LOW);
-    digitalWrite(node::config.status_green_pin, green != inverted ? HIGH : LOW);
-    digitalWrite(node::config.status_blue_pin, blue != inverted ? HIGH : LOW);
-}
+DhtSensor* sensor = nullptr;
+MqttClient mqtt(
+    node::config.node_id,
+    node::config.mqtt_host,
+    node::config.mqtt_port
+);
+UdpTransport udp(
+    node::config.local_port,
+    node::config.server_address,
+    node::config.server_port
+);
+StatusLed* statusLed = nullptr;
+TemperatureDisplay* display = nullptr;
 
 void updateStatusLed() {
-    if (WiFi.status() != WL_CONNECTED) {
-        setStatusLed(false, false, true);
-    } else if (sensorError || transmissionError) {
-        setStatusLed(true, false, false);
-    } else if (!timeSynchronized || !mqttIsConnected()) {
-        setStatusLed(true, true, false);
-    } else {
-        setStatusLed(false, true, false);
-    }
-}
-
-void showDisplayUnavailable() {
-    if (statusDisplay != nullptr) {
-        for (uint8_t position = 0; position < 3; ++position) {
-            statusDisplay->displayNum(position, 20);
-        }
-    }
-}
-
-void showTemperature(float temperature) {
-    if (statusDisplay == nullptr) {
+    if (statusLed == nullptr) {
         return;
     }
-    const int value = static_cast<int>(std::round(temperature));
-    if (value < -99 || value > 999) {
-        showDisplayUnavailable();
-        return;
-    }
-    if (value < 0) {
-        statusDisplay->displayNum(0, 20);
-        statusDisplay->displayNum(1, -value >= 10 ? (-value / 10) : 16);
-        statusDisplay->displayNum(2, -value % 10);
-    } else {
-        statusDisplay->displayNum(0, value >= 100 ? value / 100 : 16);
-        statusDisplay->displayNum(1, value >= 10 ? (value / 10) % 10 : 16);
-        statusDisplay->displayNum(2, value % 10);
-    }
+    statusLed->update(
+        WiFi.status() == WL_CONNECTED,
+        sensorError,
+        transmissionError,
+        timeSynchronized,
+        mqtt.isConnected()
+    );
 }
 
-void initializeStatusOutputs() {
-    if (node::config.status_led_enabled) {
-        pinMode(node::config.status_red_pin, OUTPUT);
-        pinMode(node::config.status_green_pin, OUTPUT);
-        pinMode(node::config.status_blue_pin, OUTPUT);
-        setStatusLed(false, false, true);
+void initializeHardware() {
+    if (node::config.dht != nullptr) {
+        static DhtSensor configuredSensor(*node::config.dht);
+        sensor = &configuredSensor;
+        sensor->begin();
     }
-    if (node::config.display_enabled) {
-        static TM1651 display(node::config.display_clk_pin, node::config.display_dio_pin);
-        statusDisplay = &display;
-        display.displaySet(node::config.display_brightness > 7 ? 7 : node::config.display_brightness);
-        display.displayDP(0);
-        showDisplayUnavailable();
+    if (node::config.status_led != nullptr) {
+        static StatusLed configuredStatusLed(*node::config.status_led);
+        statusLed = &configuredStatusLed;
+        statusLed->begin();
+    }
+    if (node::config.display != nullptr) {
+        static TemperatureDisplay temperatureDisplay(
+            *node::config.display
+        );
+        display = &temperatureDisplay;
+        display->begin();
     }
 }
 
@@ -120,16 +100,23 @@ void sendReading() {
         sessionId = std::string("boot-") + std::to_string(esp_random());
         return;
     }
+    if (sensor == nullptr) {
+        return;
+    }
 
     float temperature = 0;
     float humidity = 0;
-    if (!dhtRead(temperature, humidity)) {
+    if (!sensor->read(temperature, humidity)) {
         sensorError = true;
-        showDisplayUnavailable();
+        if (display != nullptr) {
+            display->showUnavailable();
+        }
         return;
     }
     sensorError = false;
-    showTemperature(temperature);
+    if (display != nullptr) {
+        display->showTemperature(temperature);
+    }
 
     const std::string timestamp = currentTimestamp();
   
@@ -180,9 +167,9 @@ void sendReading() {
         Serial.println(datagram.c_str());
 
         // Same JSON to the Command Centre; it accepts the UDP envelope as-is.
-        mqttPublishReading(datagram);
+        mqtt.publishReading(datagram);
 
-        transmissionError = !udpSend(datagram);
+        transmissionError = !udp.send(datagram);
     }
     catch (const ProtocolError& error) {
         transmissionError = true;
@@ -202,7 +189,7 @@ void sendReading() {
 void setup() {
 
     Serial.begin(node::config.serial_baud);
-    initializeStatusOutputs();
+    initializeHardware();
 
     Serial.println("Connecting to WiFi...");
 
@@ -222,14 +209,12 @@ void setup() {
     timeSynchronized = getLocalTime(&timeinfo, node::config.time_sync_threshold_ms);
     Serial.println(timeSynchronized ? "Time synchronized!" : "Time synchronization failed");
 
-    dhtBegin();
-
     Serial.print("ESP32 IP: ");
     Serial.println(WiFi.localIP());
 
-    udpBegin();
+    transmissionError = !udp.begin();
 
-    mqttStart();
+    mqtt.begin();
 }
 
 /**
@@ -244,7 +229,7 @@ void loop() {
 
     while (millis() - start < node::config.response_timeout_ms) {
 
-        udpReceiveResponse(sessionId, sequenceNumber);
+        udp.receiveResponse(sessionId, sequenceNumber);
         updateStatusLed();
 
         delay(10);
