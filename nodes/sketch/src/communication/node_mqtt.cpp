@@ -1,4 +1,5 @@
 #include "node_mqtt.h"
+#include "../common/mqtt_topics.h"
 
 #include <Arduino.h>
 
@@ -7,8 +8,8 @@ MqttClient::MqttClient(const char* nodeId, const char* brokerHost,
         : m_nodeId(nodeId),
             m_brokerHost(brokerHost),
             m_brokerPort(brokerPort),
-            m_weatherTopic(std::string("comcs/cell1/") + nodeId + "/weather"),
-            m_statusTopic(std::string("comcs/cell1/") + nodeId + "/status") {}
+            m_weatherTopic(common::mqtt::weather_topic(nodeId)),
+            m_statusTopic(common::mqtt::status_topic(common::mqtt::node_topic(nodeId))) {}
 
 void MqttClient::begin() {
     esp_mqtt_client_config_t config{};

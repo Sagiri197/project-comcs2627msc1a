@@ -27,7 +27,7 @@ COMCS access point is up   (Ctrl+C to stop and remove it)
                    pool.ntp.org           192.168.50.1
                    ...
 
-  ESP32 config (nodes/configs/*.h):
+  ESP32 config (nodes/sketch/src/configs/*.h):
     wifi_ssid        "comcs-cell1"
     wifi_password    "comcs2627"
     server_address   alert server name from dns.txt, UDP 8080

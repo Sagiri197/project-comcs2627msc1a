@@ -6,13 +6,15 @@
 #include "udp_socket.h"
 
 #include <memory>
+#include <optional>
 
 class AlertServer {
 public:
-    /** @brief A decoded protocol message and the endpoint that sent it. */
+    /** @brief A decoded message, its sender, and an optional reading comparison. */
     struct ReceivedMessage {
         common::protocol::Message message;
         UdpEndpoint sender;
+        std::optional<AlertLogic::ComparisonResult> comparison;
     };
 
     /**
@@ -34,7 +36,7 @@ public:
 
     /**
      * @brief Receives, decodes, and processes one datagram.
-     * @return The decoded message and its sender endpoint.
+     * @return The decoded message, sender endpoint, and any reading comparison.
      * @throws PersistenceError if a reading cannot be stored.
      * @throws std::exception if receiving or decoding the datagram fails.
      */

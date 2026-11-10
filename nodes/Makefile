@@ -11,7 +11,7 @@ BUILD_ROOT ?= build
 
 NODES ?= 1 2 3
 # Node for `make monitor` / `make flash-monitor`, and the baud rate (serial_baud in
-# configs/*.h).
+# sketch/src/configs/*.h).
 NODE ?= 1
 BAUD ?= 9600
 
@@ -43,14 +43,13 @@ MONITOR_PORT_1 ?= $(PORT_1)
 MONITOR_PORT_2 ?= $(PORT_2)
 MONITOR_PORT_3 ?= $(PORT_3)
 
-.PHONY: help ports prepare compile compile-node flash flash-node monitor flash-monitor clean
+.PHONY: help ports compile compile-node flash flash-node monitor flash-monitor clean
 
 help:
 	@printf '%s\n' \
 		'make flash                         Flash all three nodes' \
 		'make flash NODES="1 3"            Flash only nodes 1 and 3' \
 		'make compile NODES="2"            Compile only node 2' \
-		'make prepare                       Copy dependencies into the sketch for Arduino IDE' \
 		'make ports                         List connected boards and the configured ports' \
 		'make monitor NODE=2               Serial monitor of node 2 (Ctrl+C to quit)' \
 		'make flash-monitor NODE=2         Flash node 2, then open its serial monitor' \
@@ -89,15 +88,7 @@ compile:
 		$(MAKE) --no-print-directory compile-node NODE=$$node; \
 	done
 
-prepare:
-	mkdir -p "$(SKETCH)/src/configs" "$(SKETCH)/src/common/nlohmann" "$(SKETCH)/src/vendor/GotekLEDC68"
-	cp config.h config_types.h "$(SKETCH)/src/"
-	cp configs/*.h "$(SKETCH)/src/configs/"
-	cp ../common/protocol.h ../common/protocol.cpp "$(SKETCH)/src/common/"
-	cp ../common/nlohmann/json.hpp ../common/nlohmann/LICENSE.MIT "$(SKETCH)/src/common/nlohmann/"
-	cp vendor/GotekLEDC68/TM1651.h vendor/GotekLEDC68/TM1651.cpp vendor/GotekLEDC68/LICENSE "$(SKETCH)/src/vendor/GotekLEDC68/"
-
-compile-node: prepare
+compile-node:
 	@test "$(NODE)" = 1 || test "$(NODE)" = 2 || test "$(NODE)" = 3 || \
 		{ printf 'Invalid NODE: %s (expected 1, 2, or 3)\n' "$(NODE)" >&2; exit 1; }
 	@mkdir -p "$(BUILD_ROOT)/node-$(NODE)"

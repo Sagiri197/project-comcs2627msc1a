@@ -25,9 +25,9 @@ inline constexpr DisplayConfig displayConfig{
 inline constexpr Config config{
     .hardware = Hardware::Esp32S3,
     .node_id = "esp32-003",
-    .wifi_ssid = "Redmi Note 13",
-    .wifi_password = "plplplpl",
-    .server_address = "172.19.96.45",
+    .wifi_ssid = "comcs-cell1",
+    .wifi_password = "comcs2627",
+    .server_address = "as.comcs.lan",
     .server_port = 8080,
     .local_port = 4210,
     .mqtt_host = "cc.comcs.lan",

@@ -1,7 +1,7 @@
 # UDP protocol v1
 
 One UTF-8 JSON object per datagram, maximum 1,200 bytes including whitespace.
-The shared C++20 API is in `common/include/common/protocol.h`, provided by the
+The shared C++20 API is in `nodes/sketch/src/common/protocol.h`, provided by the
 `common::protocol` CMake target. `encode(Message)` returns a datagram;
 `decode(string_view)` returns a variant of `Reading`, `Ack`, or `Reject`.
 Both reject invalid inputs with `ProtocolError`, which exposes an `ErrorCode`.

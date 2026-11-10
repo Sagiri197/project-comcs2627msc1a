@@ -237,6 +237,25 @@ TEST_F(AlertServerTest, PropagatesInvalidDestinationErrors) {
     expect_no_reply();
 }
 
+TEST_F(AlertServerTest, ReturnsComparisonForAlertPublication) {
+    send_wire(encode(reading()));
+    const auto first = server.receive();
+    EXPECT_FALSE(first.comparison);
+    receive_wire();
+
+    auto next_reading = reading();
+    next_reading.identity.seq = 43;
+    next_reading.payload.id = "urn:ngsi-ld:WeatherObserved:esp32-a:boot-1:43";
+    next_reading.payload.temperature += 3.0;
+    send_wire(encode(next_reading));
+    const auto second = server.receive();
+
+    ASSERT_TRUE(second.comparison);
+    EXPECT_TRUE(second.comparison->exceeds_temp_threshold);
+    EXPECT_EQ(std::get<Reading>(second.message).identity.seq, 43);
+    EXPECT_TRUE(std::holds_alternative<Ack>(decode(receive_wire())));
+}
+
 TEST_F(AlertServerTest, PersistsReadingBeforeAcknowledgement) {
     send_wire(encode(reading()));
     const auto received = server.receive();

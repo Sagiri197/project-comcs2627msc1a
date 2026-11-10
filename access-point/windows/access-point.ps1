@@ -293,7 +293,7 @@ function Show-Banner($Cfg, [string]$Address) {
         Write-Warn "some names in dns.windows.txt do not point at this hotspot ($Address)"
     }
     Write-Host ''
-    Write-Host '  ESP32 config (nodes/configs/*.h):'
+    Write-Host '  ESP32 config (nodes/sketch/src/configs/*.h):'
     Write-Host ('    {0,-16} "{1}"' -f 'wifi_ssid', $Cfg['AP_SSID'])
     Write-Host ('    {0,-16} "{1}"' -f 'wifi_password', $Cfg['AP_PASSWORD'])
     Write-Host ('    {0,-16} alert server name from dns.windows.txt, UDP {1} (run it on this machine)' -f 'server_address', $alertPort)

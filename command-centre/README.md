@@ -61,7 +61,7 @@ NAT, so they cannot reach a broker running in it.
 Connect this machine's Wi-Fi to the Pi's access point (`AP_SSID` in `access-point/ap.env`). The Pi
 gives it an address by DHCP; once it has joined, add `cc.comcs.lan <that address>` (shown in the
 access point's device log) to `access-point/dns.txt`, and the name resolves within 2 s. The
-ESP32s (`mqtt_host` in `nodes/configs/*.h`) and the alert server use that name.
+ESP32s (`mqtt_host` in `nodes/sketch/src/configs/*.h`) and the alert server use that name.
 
 | What      | Where                                          |
 |-----------|------------------------------------------------|
@@ -75,7 +75,7 @@ editor returns an empty response until then.
 
 ## MQTT contract
 
-All messages use QoS 1. `<nodeId>` matches `node_id` in `nodes/configs/*.h` (for example `esp32-001`).
+All messages use QoS 1. `<nodeId>` matches `node_id` in `nodes/sketch/src/configs/*.h` (for example `esp32-001`).
 
 | Topic                          | Publisher     | Payload                                   | Retained |
 |--------------------------------|---------------|-------------------------------------------|----------|

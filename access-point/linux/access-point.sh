@@ -203,7 +203,7 @@ print_banner() {
         printf '  %-14s   %-22s %s\n' "" "${entry#* }" "${entry%% *}"
     done
     echo
-    echo "  ESP32 config (nodes/configs/*.h):"
+    echo "  ESP32 config (nodes/sketch/src/configs/*.h):"
     printf '    %-16s "%s"\n' wifi_ssid "$AP_SSID" wifi_password "$AP_PASSWORD"
     printf '    %-16s %s\n' server_address "${D}alert server name from dns.txt, UDP $ALERT_SERVER_UDP_PORT${N}"
     printf '    %-16s %s\n' mqtt_host "${D}broker name from dns.txt, TCP $MQTT_PORT${N}"
