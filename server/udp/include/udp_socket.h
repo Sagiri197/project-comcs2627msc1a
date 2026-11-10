@@ -15,17 +15,19 @@ struct UdpDatagram {
     UdpEndpoint sender;
 };
 
-// A bound IPv4 UDP socket. Implemented by PosixUdpSocket (udp_socket_posix.h) and
-// WindowsUdpSocket (udp_socket_windows.h); only the one for the target platform is built.
+/** @brief Bound IPv4 UDP socket abstraction used by the server. */
 class IUdpSocket {
 public:
     virtual ~IUdpSocket() = default;
 
-    // Sends one datagram. Throws std::invalid_argument for a malformed address and
-    // std::system_error if the OS rejects the send.
+    /**
+     * @brief Sends one datagram.
+     * @throws std::invalid_argument if the destination address is malformed.
+     * @throws std::system_error if the operating system rejects the send.
+     */
     virtual void send(std::string_view data, const UdpEndpoint& destination) const = 0;
 
-    // Blocks until a datagram arrives. Throws std::system_error on failure.
+    /** @brief Blocks until a datagram arrives; throws std::system_error on failure. */
     virtual UdpDatagram recv() const = 0;
 
 protected:
@@ -34,5 +36,5 @@ protected:
     IUdpSocket& operator=(const IUdpSocket&) = delete;
 };
 
-// Creates the socket implementation for the platform being built, bound to `endpoint`.
+/** @brief Creates the platform-specific IPv4 socket bound to `endpoint`. */
 std::unique_ptr<IUdpSocket> make_udp_socket(const UdpEndpoint& endpoint = {"0.0.0.0", 0});

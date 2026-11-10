@@ -11,6 +11,7 @@ namespace {
 constexpr char online_payload[] = "online";
 constexpr char offline_payload[] = "offline";
 constexpr auto retry_delay = std::chrono::seconds(2);
+
 // A connect that has not completed by then is abandoned and retried. Needed on Windows, where
 // a refused non-blocking connect is only signalled through select()'s except set, which
 // libmosquitto does not watch, so mosquitto_loop() would otherwise wait forever.
@@ -24,7 +25,7 @@ int publish_text(mosquitto* client, const std::string& topic, const std::string&
 
 }  // namespace
 
-StatusPublisher::StatusPublisher(Config config, HeartbeatFactory make_heartbeat)
+StatusPublisher::StatusPublisher(ServerConfig::MqttSettings config, HeartbeatFactory make_heartbeat)
     : m_config(std::move(config)),
       m_make_heartbeat(std::move(make_heartbeat)),
       m_status_topic(m_config.topic + "/status"),
@@ -67,14 +68,17 @@ void StatusPublisher::on_connect(mosquitto* client, void* self, int rc) {
     }
     publisher->m_connected = true;
     publisher->m_heartbeat_due = true;   // announce ourselves right away, then every interval
+    
     publish_text(client, publisher->m_status_topic, online_payload, 1, true);
     spdlog::info("MQTT connected to {}:{}; status on {}, heartbeat every {} ms", publisher->m_config.host,
-                 publisher->m_config.port, publisher->m_config.topic, publisher->m_config.interval.count());
+                 publisher->m_config.port, publisher->m_config.topic,
+                 publisher->m_config.heartbeat_interval.count());
 }
 
 void StatusPublisher::on_disconnect(mosquitto*, void* self, int rc) {
     auto* publisher = static_cast<StatusPublisher*>(self);
     const bool was_connected = publisher->m_connected.exchange(false);
+    
     if (was_connected && rc != 0 && !publisher->m_stop) {
         spdlog::warn("MQTT connection to {}:{} lost; reconnecting", publisher->m_config.host,
                      publisher->m_config.port);
@@ -84,7 +88,7 @@ void StatusPublisher::on_disconnect(mosquitto*, void* self, int rc) {
 void StatusPublisher::run() {
     using clock = std::chrono::steady_clock;
 
-    bool session = false;            // a socket exists (the CONNACK may still be pending)
+    bool session = false; // a socket exists (the CONNACK may still be pending)
     bool reported_unreachable = false;
     auto next_attempt = clock::now();
     auto next_heartbeat = clock::now();
@@ -145,7 +149,7 @@ void StatusPublisher::run() {
             if (m_heartbeat_due || clock::now() >= next_heartbeat) {
                 publish_heartbeat();
                 m_heartbeat_due = false;
-                next_heartbeat = clock::now() + m_config.interval;
+                next_heartbeat = clock::now() + m_config.heartbeat_interval;
             }
         }
     }

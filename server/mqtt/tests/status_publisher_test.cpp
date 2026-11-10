@@ -11,12 +11,14 @@ using namespace std::chrono_literals;
 namespace {
 
 // A loopback port with nothing listening: connections are refused immediately.
-StatusPublisher::Config unreachable_broker() {
-    StatusPublisher::Config config;
+ServerConfig::MqttSettings unreachable_broker() {
+    ServerConfig::MqttSettings config{};
     config.host = "127.0.0.1";
     config.port = 1;
     config.client_id = "alert-server-test";
-    config.interval = 100ms;
+    config.topic = "comcs/cell1/alert-server-test";
+    config.heartbeat_interval = 100ms;
+    config.keepalive_seconds = 10;
     return config;
 }
 

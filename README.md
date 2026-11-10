@@ -35,10 +35,6 @@ git submodule update --init --recursive
 ### Command Centre
 - [Docker](https://www.docker.com/) (para correr o broker MQTT e Node-RED)
 
-## Contexto
-
-![](docs/images/system.png)
-
 ## Arrancar tudo
 
 1. Command Centre (broker MQTT + Node-RED):
@@ -51,7 +47,7 @@ git submodule update --init --recursive
    ```
 3. Servidor de alerta (noutro terminal, sempre a partir da mesma pasta):
    ```sh
-   server\build\bin\Release\alert_server.exe  # Linux: server/build/bin/alert_server
+   server\build\bin\Release\alert_server.exe --config server/config/alert_server.ini  # Linux: server/build/bin/alert_server
    ```
 4. a. Flash e monitor de cada ESP32 (uma por terminal):
    ```sh
@@ -68,7 +64,7 @@ git submodule update --init --recursive
 cmake -S server -B server/build -DBUILD_TESTING=ON
 cmake --build server/build -j2
 ctest --test-dir server/build --output-on-failure
-./server/build/bin/alert_server
+./server/build/bin/alert_server --config server/config/alert_server.ini
 ```
 
 ### Documentação

@@ -1,6 +1,6 @@
 # MQTT status/heartbeat publisher (libmosquitto, built from vendor/mosquitto).
 add_library(mqtt_status src/status_publisher.cpp)
-target_include_directories(mqtt_status PUBLIC include)
+target_include_directories(mqtt_status PUBLIC include ../config/include)
 target_link_libraries(mqtt_status PUBLIC spdlog::spdlog PRIVATE libmosquitto_static)
 
 if(BUILD_TESTING)
