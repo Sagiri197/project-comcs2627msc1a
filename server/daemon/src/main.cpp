@@ -22,13 +22,13 @@ namespace {
 void print_usage() {
     std::cout <<
         "Usage: alert_server [--config FILE] [--help]\n"
-        "  --config FILE  INI settings file (default server/config/alert_server.ini)\n"
+        "  --config FILE  INI settings file (default server/alert_server.ini)\n"
         "  --help         show this help\n";
 }
 
 std::string parse_config_path(int argc, char** argv) {
     
-    std::string config_path = "server/config/alert_server.ini";
+    std::string config_path = "server/alert_server.ini";
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
         if (arg == "--config") {
