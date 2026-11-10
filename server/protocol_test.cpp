@@ -1,5 +1,6 @@
 #ifndef ARDUINO
 #include "protocol.h"
+#include "mqtt_topics.h"
 
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
@@ -10,6 +11,17 @@ namespace {
 
 using namespace common::protocol;
 using Json = nlohmann::json;
+
+TEST(MqttTopics, PreservesNodeTopics) {
+    EXPECT_EQ(common::mqtt::weather_topic("esp32-003"), "comcs/cell1/esp32-003/weather");
+    EXPECT_EQ(common::mqtt::status_topic(common::mqtt::node_topic("esp32-003")),
+              "comcs/cell1/esp32-003/status");
+}
+
+TEST(MqttTopics, PreservesConfigurableServerBase) {
+    EXPECT_EQ(common::mqtt::status_topic("custom/alert-server"), "custom/alert-server/status");
+    EXPECT_EQ(common::mqtt::heartbeat_topic("custom/alert-server"), "custom/alert-server/heartbeat");
+}
 
 Reading reading() {
     return {{"esp32-a", "c79e4fd8-5888-4ae5-8556-c1e558aa6020", 42}, Qos::AtLeastOnce,

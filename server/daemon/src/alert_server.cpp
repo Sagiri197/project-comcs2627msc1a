@@ -15,6 +15,7 @@ AlertServer::AlertServer(ReadingStore& store, AlertLogic& logic, std::unique_ptr
 AlertServer::ReceivedMessage AlertServer::receive() {
 
     auto datagram = m_socket->recv();
+    std::optional<AlertLogic::ComparisonResult> comparison;
     
     try {
         auto message = common::protocol::decode(datagram.data);
@@ -23,7 +24,7 @@ AlertServer::ReceivedMessage AlertServer::receive() {
             
             try {
 
-                m_logic.processReading(*reading);
+                comparison = m_logic.processReading(*reading);
                 
                 // Save the reading to database
                 m_store.save(*reading);
@@ -50,7 +51,7 @@ AlertServer::ReceivedMessage AlertServer::receive() {
             }
         }
 
-        return {std::move(message), std::move(datagram.sender)};
+        return {std::move(message), std::move(datagram.sender), std::move(comparison)};
     } catch (const common::protocol::ProtocolError& e) {
         spdlog::warn("Decode error: {}", e.what());
         throw;

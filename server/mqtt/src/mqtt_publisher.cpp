@@ -1,4 +1,5 @@
 #include "mqtt_publisher.h"
+#include "common/mqtt_topics.h"
 
 #include <mosquitto.h>
 #include <spdlog/spdlog.h>
@@ -24,7 +25,7 @@ int publish_text(mosquitto* client, const std::string& topic, const std::string&
 
 MqttPublisher::MqttPublisher(ServerConfig::MqttSettings config)
     : m_config(std::move(config)),
-      m_status_topic(m_config.topic + "/status") {
+    m_status_topic(common::mqtt::status_topic(m_config.topic)) {
     
     mosquitto_lib_init();
 

@@ -14,11 +14,6 @@ logs/
 
 # Nodes
 build/
-nodes/sketch/src/config.h
-nodes/sketch/src/config_types.h
-nodes/sketch/src/common/
-nodes/sketch/src/configs/
-nodes/sketch/src/vendor/
 
 # Node-RED runtime files (command-centre/nodered is mounted as /data)
 command-centre/nodered/.config.*.json

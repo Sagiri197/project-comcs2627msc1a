@@ -1,4 +1,5 @@
 #include "alert_server.h"
+#include "alert_publisher.h"
 #include "application.h"
 #include "server_stats.h"
 #include "status_publisher.h"
@@ -21,13 +22,13 @@ namespace {
 void print_usage() {
     std::cout <<
         "Usage: alert_server [--config FILE] [--help]\n"
-        "  --config FILE  INI settings file (default server/config/alert_server.ini)\n"
+        "  --config FILE  INI settings file (default server/alert_server.ini)\n"
         "  --help         show this help\n";
 }
 
 std::string parse_config_path(int argc, char** argv) {
     
-    std::string config_path = "server/config/alert_server.ini";
+    std::string config_path = "server/alert_server.ini";
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
         if (arg == "--config") {
@@ -67,20 +68,23 @@ int main(int argc, char** argv) {
 
         std::unique_ptr<MqttPublisher> mqtt;
         std::unique_ptr<StatusPublisher> status;
+        std::unique_ptr<AlertPublisher> alerts;
         if (config.mqtt_enabled) {
             mqtt = std::make_unique<MqttPublisher>(config.mqtt);
             status = std::make_unique<StatusPublisher>(*mqtt, config.mqtt, config.udp.port);
+            alerts = std::make_unique<AlertPublisher>(*mqtt, config.mqtt);
         } else {
             spdlog::info("MQTT disabled by configuration");
         }
 
         std::signal(SIGINT, request_stop);
         std::signal(SIGTERM, request_stop);
-        std::thread([&mqtt, &status] {
+        std::thread([&mqtt, &status, &alerts] {
             while (!stop_requested) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
             spdlog::info("Stopping");
+            alerts.reset();
             status.reset();
             mqtt.reset();   // publishes "offline" and disconnects
             spdlog::shutdown();
@@ -100,6 +104,7 @@ int main(int argc, char** argv) {
 
                 if (const auto* reading = std::get_if<common::protocol::Reading>(&received.message)) {
                     if (status) status->reading_received(reading->identity.node_id);
+                    if (alerts && received.comparison) alerts->publish(*reading, *received.comparison);
                 }
 
             } catch (const common::protocol::ProtocolError& error) {

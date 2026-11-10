@@ -8,7 +8,7 @@ git submodule update --init --recursive
 
 - `/.scripts`: Scripts auxiliares
 - `/docs`: Documentação do projecto
-- `/common`: Protocolo partilhado entre nodes e servidor
+- `/common`: Build CMake e testes do protocolo partilhado em `/nodes/sketch/src/common`
 - `/nodes`: Sketches para correr nos ESP32s
 - `/server`: Servidor UDP de alerta (só o programa: código C++, build e testes)
 - `/access-point`: Rede Wi-Fi da célula (access point, DHCP/DNS, NTP): `linux/` para o Raspberry Pi, `windows/` para testar num portátil
@@ -47,7 +47,7 @@ git submodule update --init --recursive
    ```
 3. Servidor de alerta (noutro terminal, sempre a partir da mesma pasta):
    ```sh
-   server\build\bin\Release\alert_server.exe --config server/config/alert_server.ini  # Linux: server/build/bin/alert_server
+   server\build\bin\Release\alert_server.exe --config server/alert_server.ini  # Linux: server/build/bin/alert_server
    ```
 4. a. Flash e monitor de cada ESP32 (uma por terminal):
    ```sh
@@ -64,7 +64,7 @@ git submodule update --init --recursive
 cmake -S server -B server/build -DBUILD_TESTING=ON
 cmake --build server/build -j2
 ctest --test-dir server/build --output-on-failure
-./server/build/bin/alert_server --config server/config/alert_server.ini
+./server/build/bin/alert_server --config server/alert_server.ini
 ```
 
 ### Documentação
@@ -78,15 +78,20 @@ cmake --build server/build --target doxygen
 
 ## Buildar sketch ESP32
 
+Abrir `nodes/sketch/sketch.ino` diretamente no Arduino IDE. Todos os fontes
+locais ficam dentro do sketch; nao e necessario executar scripts de preparacao.
+Instalar o pacote de placas ESP32 da Espressif (3.x ou superior) e as bibliotecas
+DHT sensor library e Adafruit Unified Sensor. Selecionar a placa e a porta.
+
 ### Configuracao de cada ESP32
 
 Os valores especificos de cada dispositivo ficam em ficheiros separados:
 
-- `nodes/configs/esp32_G.h`: ID `esp32-001`, com a rede e posicao existentes.
-- `nodes/configs/esp32_P.h`: ID `esp32-002`.
-- `nodes/configs/esp32_T.h`: ID `esp32-003`.
+- `nodes/sketch/src/configs/esp32_G.h`: ID `esp32-001`, com a rede e posicao existentes.
+- `nodes/sketch/src/configs/esp32_P.h`: ID `esp32-002`.
+- `nodes/sketch/src/configs/esp32_T.h`: ID `esp32-003`.
 
-Antes de cada upload, escolher o dispositivo em `sketch/config.h`, alterando
+Antes de cada upload, escolher o dispositivo em `nodes/sketch/src/config.h`, alterando
 o valor por defeito de `NODE_PROFILE` para `1`, `2` ou `3`:
 
 ### ESP32 esquemáticas![](./docs/images/esp32_controller.svg)

@@ -1,4 +1,5 @@
 #include "status_publisher.h"
+#include "common/mqtt_topics.h"
 
 #include <spdlog/spdlog.h>
 
@@ -15,7 +16,7 @@ StatusPublisher::StatusPublisher(IMqttPublisher& mqtt, ServerConfig::MqttSetting
     : m_mqtt(mqtt),
       m_udp_port(udp_port),
       m_heartbeat_interval(config.heartbeat_interval),
-      m_heartbeat_topic(config.topic + "/heartbeat"),
+    m_heartbeat_topic(common::mqtt::heartbeat_topic(config.topic)),
       m_thread(&StatusPublisher::run, this) {}
 
 StatusPublisher::~StatusPublisher() {
