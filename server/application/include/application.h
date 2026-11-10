@@ -2,6 +2,7 @@
 
 #include "common/protocol.h"
 #include <chrono>
+#include <optional>
 
 class ReadingStore;
 
@@ -28,7 +29,8 @@ public:
      * @brief Logs a reading and evaluates it against the previous stored reading.
      * @param reading Reading to process.
      */
-    void processReading(const common::protocol::Reading& reading);
+    std::optional<ComparisonResult> processReading(
+        const common::protocol::Reading& reading);
 
 private:
     ReadingStore& m_store;
@@ -47,7 +49,7 @@ private:
                                      const common::protocol::Reading& last) const;
     void logReading(const common::protocol::Reading& reading) const;
     
-    inline void logAlert(const ComparisonResult& result, 
-                        const common::protocol::Reading& current,
-                        const common::protocol::Reading& last) const;
+    inline void logComparison(const ComparisonResult& result,
+                              const common::protocol::Reading& current,
+                              const common::protocol::Reading& last) const;
 };
