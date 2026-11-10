@@ -65,23 +65,24 @@ int main(int argc, char** argv) {
         AlertServer server(store, logic, {config.udp.bind_address, config.udp.port});
         spdlog::info("UDP server listening on port {}", config.udp.port);
 
-        ServerStats stats;
+        std::unique_ptr<MqttPublisher> mqtt;
         std::unique_ptr<StatusPublisher> status;
         if (config.mqtt_enabled) {
-            status = std::make_unique<StatusPublisher>(config.mqtt,
-                [&stats, port = config.udp.port] { return stats.heartbeat_json(port); });
+            mqtt = std::make_unique<MqttPublisher>(config.mqtt);
+            status = std::make_unique<StatusPublisher>(*mqtt, config.mqtt, config.udp.port);
         } else {
             spdlog::info("MQTT disabled by configuration");
         }
 
         std::signal(SIGINT, request_stop);
         std::signal(SIGTERM, request_stop);
-        std::thread([&status] {
+        std::thread([&mqtt, &status] {
             while (!stop_requested) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
             spdlog::info("Stopping");
-            status.reset();   // publishes "offline" and disconnects
+            status.reset();
+            mqtt.reset();   // publishes "offline" and disconnects
             spdlog::shutdown();
             std::_Exit(0);
         }).detach();
@@ -98,14 +99,14 @@ int main(int argc, char** argv) {
                 }, received.message);
 
                 if (const auto* reading = std::get_if<common::protocol::Reading>(&received.message)) {
-                    stats.reading_received(reading->identity.node_id);
+                    if (status) status->reading_received(reading->identity.node_id);
                 }
 
             } catch (const common::protocol::ProtocolError& error) {
-                stats.invalid_datagram();
+                if (status) status->invalid_datagram();
                 spdlog::warn("Ignoring invalid protocol datagram: {}", error.what());
             } catch (const PersistenceError& error) {
-                stats.storage_error();
+                if (status) status->storage_error();
                 spdlog::error("Reading was not acknowledged: {}", error.what());
             }
         }

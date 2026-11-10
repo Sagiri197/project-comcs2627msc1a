@@ -1,49 +1,45 @@
 #pragma once
 
+#include "mqtt_publisher.h"
+#include "server_stats.h"
 #include "server_config.h"
 
 #include <atomic>
-#include <functional>
+#include <cstdint>
+#include <chrono>
 #include <string>
 #include <thread>
 
-struct mosquitto;
-
 class StatusPublisher {
 public:
-    using HeartbeatFactory = std::function<std::string()>;
-
     /**
-     * @brief Starts the background MQTT publisher.
-     * @param config Broker and publication settings.
-     * @param make_heartbeat Callback that creates the current heartbeat JSON.
+     * @brief Starts periodic heartbeat publication through the shared MQTT publisher.
+     * @param mqtt Shared MQTT transport.
+     * @param config MQTT settings used for heartbeat topic and interval.
+     * @param udp_port UDP port served by the daemon and included in heartbeats.
      */
-    StatusPublisher(ServerConfig::MqttSettings config, HeartbeatFactory make_heartbeat);
+    StatusPublisher(IMqttPublisher& mqtt, ServerConfig::MqttSettings config, std::uint16_t udp_port);
 
-    /** @brief Publishes offline status, disconnects, and joins the publisher thread. */
+    /** @brief Stops and joins the heartbeat thread. */
     ~StatusPublisher();
 
     StatusPublisher(const StatusPublisher&) = delete;
     StatusPublisher& operator=(const StatusPublisher&) = delete;
 
-    bool connected() const noexcept { return m_connected; }
+    bool connected() const noexcept { return m_mqtt.connected(); }
+    void reading_received(const std::string& node_id) { m_stats.reading_received(node_id); }
+    void invalid_datagram() noexcept { m_stats.invalid_datagram(); }
+    void storage_error() noexcept { m_stats.storage_error(); }
 
 private:
-    static void on_connect(mosquitto* client, void* self, int rc);
-    static void on_disconnect(mosquitto* client, void* self, int rc);
-
     void run();
     void publish_heartbeat();
-    void shutdown_session();
 
-    ServerConfig::MqttSettings m_config;
-    HeartbeatFactory m_make_heartbeat;
-    std::string m_status_topic;
+    IMqttPublisher& m_mqtt;
+    std::uint16_t m_udp_port;
+    std::chrono::milliseconds m_heartbeat_interval;
+    ServerStats m_stats;
     std::string m_heartbeat_topic;
-
-    mosquitto* m_client = nullptr;
     std::atomic<bool> m_stop{false};
-    std::atomic<bool> m_connected{false};
-    bool m_heartbeat_due = false;   // only touched by the publisher thread
     std::thread m_thread;
 };
