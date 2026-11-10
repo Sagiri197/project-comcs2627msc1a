@@ -1,0 +1,17 @@
+{
+  "tests": 1,
+  "name": "AllTests",
+  "testsuites": [
+    {
+      "name": "ServerConfig",
+      "tests": 1,
+      "testsuite": [
+        {
+          "name": "LoadsSampleIniIntoRuntimeSettings",
+          "file": "\/home\/ctw04964\/personal\/isep2\/comics\/project\/server\/config\/tests\/server_config_test.cpp",
+          "line": 7
+        }
+      ]
+    }
+  ]
+}

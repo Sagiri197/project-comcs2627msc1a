@@ -1,4 +1,4 @@
-PROJECT_NAME           = "COMICS"
+PROJECT_NAME           = "COMCS"
 PROJECT_BRIEF          = "Alert server, ESP32 firmware and shared communication protocol"
 OUTPUT_DIRECTORY       = doxygen
 INPUT                  = ../README.md ../common application daemon mqtt persistency udp ../nodes/sketch ../nodes/config_types.h

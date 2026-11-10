@@ -1,2 +1,5 @@
 - [/] Persistir o schema direito e não o payload todo (se calhar tmb mas não só o payload)
 - [/] Transaction tem de ser feitas imediatamente e não so quando o programa acabar 
+- [/] Move configurations to a config file
+- [ ] Make mqtt information common between server and nodes
+- [ ] Publicar alertas por MQTT (lowkey importante)

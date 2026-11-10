@@ -12,27 +12,22 @@ double toPercent(double fraction) { return fraction * 100.0; }
 AlertLogic::AlertLogic(ReadingStore& store)
     : m_store(store), m_last_reading_time(std::chrono::system_clock::now()) {}
 
-void AlertLogic::processReading(const common::protocol::Reading& reading) {
+std::optional<AlertLogic::ComparisonResult> AlertLogic::processReading(
+    const common::protocol::Reading& reading) {
     const auto now = std::chrono::system_clock::now();
-    
-    // Always log the received reading
-    logReading(reading);
-    
-    // Try to get last reading from database
-    if (auto last = m_store.getLastReading()) {
 
-        auto result = compareWithLast(reading, *last);
-        
-        spdlog::info("Time difference: {}ms", result.time_diff.count());
-        spdlog::info("Temperature differential: {:.2f}°C (threshold: {:.2f}°C)", result.temperature_diff, TEMPERATURE_THRESHOLD);
-        spdlog::info("Humidity differential: {:.2f}% (threshold: {:.2f}%)", result.humidity_diff, HUMIDITY_THRESHOLD);
-        
-        logAlert(result, reading, *last);
+    std::optional<ComparisonResult> comparison;
+    logReading(reading);
+
+    if (auto last = m_store.getLastReading()) {
+        comparison = compareWithLast(reading, *last);
+        logComparison(*comparison, reading, *last);
     } else {
         spdlog::info("First reading received, no comparison yet");
     }
-    
+
     m_last_reading_time = now;
+    return comparison;
 }
 
 AlertLogic::ComparisonResult AlertLogic::compareWithLast(
@@ -81,36 +76,31 @@ void AlertLogic::logReading(const common::protocol::Reading& reading) const {
     spdlog::info("Sequence: {}", identity.seq);
     spdlog::info("Temperature: {:.2f}°C", payload.temperature);
     spdlog::info("Humidity: {:.2f}%", toPercent(payload.relative_humidity));
-    spdlog::info("============================");
 }
 
-inline void AlertLogic::logAlert(const ComparisonResult& result,
-                                 const common::protocol::Reading& current,
-                                 const common::protocol::Reading& last) const {
+inline void AlertLogic::logComparison(const ComparisonResult& result,
+                                      const common::protocol::Reading& current,
+                                      const common::protocol::Reading& last) const {
     bool has_alert = result.exceeds_temp_threshold || 
                      result.exceeds_humidity_threshold || 
                      result.out_of_temp_range || 
                      result.out_of_humidity_range;
-    
-    if (!has_alert) {
-        return;
+  
+    spdlog::info("Time difference: {} ms", result.time_diff.count());
+    spdlog::info("Temperature difference: {:.2f}°C", result.temperature_diff);
+    spdlog::info("Humidity difference: {:.2f}%", result.humidity_diff);
+
+    if (has_alert) {
+
+        spdlog::warn("Alert triggered for node {}", current.identity.node_id);
+
+        if (result.out_of_temp_range)
+            spdlog::warn("Temperature out of range: {}", result.out_of_temp_range);
+        if (result.out_of_humidity_range)
+            spdlog::warn("Humidity out of range: {}", result.out_of_humidity_range);
+        if (result.exceeds_temp_threshold)
+            spdlog::warn("Temperature exceeds threshold: {}", result.exceeds_temp_threshold);
+        if (result.exceeds_humidity_threshold)
+            spdlog::warn("Humidity exceeds threshold: {}", result.exceeds_humidity_threshold);
     }
-    
-    spdlog::warn("ALERT");
-    spdlog::warn("  Previous: {} ({:.2f}°C, {:.2f}%)", 
-                 last.identity.node_id, last.payload.temperature, toPercent(last.payload.relative_humidity));
-    spdlog::warn("  Current:  {} ({:.2f}°C, {:.2f}%)", 
-                 current.identity.node_id, current.payload.temperature, toPercent(current.payload.relative_humidity));
-    
-    if (result.exceeds_temp_threshold) 
-        spdlog::warn("\tTemperature differential {:.2f}°C EXCEEDS threshold {:.2f}°C", result.temperature_diff, TEMPERATURE_THRESHOLD);
-    
-    if (result.exceeds_humidity_threshold) 
-        spdlog::warn("\tHumidity differential {:.2f}% EXCEEDS threshold {:.2f}%", result.humidity_diff, HUMIDITY_THRESHOLD);
-    
-    if (result.out_of_temp_range) 
-        spdlog::warn("\tTemperature OUT OF RANGE [{:.1f}°C - {:.1f}°C]", TEMPERATURE_MIN, TEMPERATURE_MAX);
-    
-    if (result.out_of_humidity_range) 
-        spdlog::warn("\tHumidity OUT OF RANGE [{:.1f}% - {:.1f}%]", HUMIDITY_MIN, HUMIDITY_MAX);
 }

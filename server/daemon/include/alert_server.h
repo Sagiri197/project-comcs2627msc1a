@@ -9,17 +9,38 @@
 
 class AlertServer {
 public:
+    /** @brief A decoded protocol message and the endpoint that sent it. */
     struct ReceivedMessage {
         common::protocol::Message message;
         UdpEndpoint sender;
     };
 
-    // Binds the platform's UDP socket (make_udp_socket) to `endpoint`.
+    /**
+     * @brief Creates a server with a platform UDP socket bound to an endpoint.
+     * @param store Reading store used to persist readings; must outlive this server.
+     * @param logic Alert processor used for received readings; must outlive this server.
+     * @param endpoint Local IPv4 address and port to bind.
+     */
     explicit AlertServer(ReadingStore& store, AlertLogic& logic, const UdpEndpoint& endpoint = {"0.0.0.0", 8080});
-    // Uses an already-created socket, e.g. a test double.
+
+    /**
+     * @brief Creates a server using an existing socket
+     * @param store Reading store used to persist readings; must outlive this server.
+     * @param logic Alert processor used for received readings; must outlive this server.
+     * @param socket Socket used for receiving and sending datagrams.
+     * @throws std::invalid_argument if `socket` is null.
+     */
     AlertServer(ReadingStore& store, AlertLogic& logic, std::unique_ptr<IUdpSocket> socket);
 
+    /**
+     * @brief Receives, decodes, and processes one datagram.
+     * @return The decoded message and its sender endpoint.
+     * @throws PersistenceError if a reading cannot be stored.
+     * @throws std::exception if receiving or decoding the datagram fails.
+     */
     ReceivedMessage receive();
+
+    /** @brief Encodes and sends a protocol message to a destination endpoint. */
     void send(const common::protocol::Message& message, const UdpEndpoint& destination) const;
 
 private:

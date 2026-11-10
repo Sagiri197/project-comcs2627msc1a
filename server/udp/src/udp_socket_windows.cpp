@@ -1,5 +1,3 @@
-// Windows (Winsock) implementation of IUdpSocket. Built instead of udp_socket_posix.cpp on Windows
-// (see udp/CMakeLists.txt); WIN32_LEAN_AND_MEAN and NOMINMAX come from CMake.
 #include "udp_socket_windows.h"
 
 #include <winsock2.h>
@@ -20,7 +18,6 @@ std::system_error socket_error(const char* what) {
     return std::system_error(WSAGetLastError(), std::system_category(), what);
 }
 
-// Winsock must be initialised once per process before any socket call.
 void ensure_winsock() {
     struct Winsock {
         Winsock() {

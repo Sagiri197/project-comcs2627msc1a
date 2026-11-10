@@ -2,12 +2,14 @@
 
 #include "common/protocol.h"
 #include <chrono>
+#include <optional>
 
 class ReadingStore;
 
 class AlertLogic 
 {
 public:
+    /** @brief Differences and threshold/range results for a pair of readings. */
     struct ComparisonResult {
         double temperature_diff;
         double humidity_diff;
@@ -20,9 +22,15 @@ public:
         bool out_of_humidity_range;
     };
 
+    /** @brief Creates alert processing logic backed by a reading store. */
     explicit AlertLogic(ReadingStore& store);
 
-    void processReading(const common::protocol::Reading& reading);
+    /**
+     * @brief Logs a reading and evaluates it against the previous stored reading.
+     * @param reading Reading to process.
+     */
+    std::optional<ComparisonResult> processReading(
+        const common::protocol::Reading& reading);
 
 private:
     ReadingStore& m_store;
@@ -41,7 +49,7 @@ private:
                                      const common::protocol::Reading& last) const;
     void logReading(const common::protocol::Reading& reading) const;
     
-    inline void logAlert(const ComparisonResult& result, 
-                        const common::protocol::Reading& current,
-                        const common::protocol::Reading& last) const;
+    inline void logComparison(const ComparisonResult& result,
+                              const common::protocol::Reading& current,
+                              const common::protocol::Reading& last) const;
 };

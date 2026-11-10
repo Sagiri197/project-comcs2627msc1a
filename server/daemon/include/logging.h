@@ -8,9 +8,12 @@
 
 inline constexpr char logger_name[] = "alert_server";
 
-// Logs to the terminal and to LOG_PATH (logs/alert_server.log, relative to the directory the
-// server is started from). The file is what server/scripts/monitor.sh follows: each line starts
-// with the Unix time so the monitor can parse it cheaply.
+/**
+ * @brief Configures the default logger for console and file output.
+ *
+ * The file sink writes to `LOG_PATH`, relative to the server's working directory, and uses
+ * Unix timestamps for log-monitoring scripts.
+ */
 inline void initialize_logger() {
     auto console = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
     console->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%n] [%^%l%$] %v");
