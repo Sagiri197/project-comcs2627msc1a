@@ -41,17 +41,18 @@ bool udpSend(const std::string& datagram) {
     return false;
 }
 
-void udpReceiveResponse(const std::string& sessionId, std::uint32_t sequenceNumber) {
+UdpResponse udpReceiveResponse(const std::string& sessionId, std::uint32_t sequenceNumber) {
 
     int packetSize = udp.parsePacket();
 
     if (packetSize <= 0) {
-        return;
+        return UdpResponse::None;
     }
 
     if (packetSize > max_datagram_size) {
         Serial.println("Received oversized datagram");
-        return;
+        udp.flush();
+        return UdpResponse::Other;
     }
 
     char buffer[max_datagram_size + 1];
@@ -62,7 +63,7 @@ void udpReceiveResponse(const std::string& sessionId, std::uint32_t sequenceNumb
     );
 
     if (len <= 0) {
-        return;
+        return UdpResponse::None;
     }
 
     buffer[len] = '\0';
@@ -94,10 +95,10 @@ void udpReceiveResponse(const std::string& sessionId, std::uint32_t sequenceNumb
                 ack->identity.seq == sequenceNumber) {
 
                 Serial.println("ACK matches current reading!");
-
-            } else {
-                Serial.println("ACK does not match current reading!");
+                return UdpResponse::Ack;
             }
+            Serial.println("ACK does not match current reading!");
+            return UdpResponse::Other;
 
         }
         else if (const auto* reject =
@@ -107,6 +108,13 @@ void udpReceiveResponse(const std::string& sessionId, std::uint32_t sequenceNumb
 
             Serial.print("Reason: ");
             Serial.println(reject->reason.c_str());
+
+            if (reject->identity.node_id == node::config.node_id &&
+                reject->identity.session_id == sessionId &&
+                reject->identity.seq == sequenceNumber) {
+                return UdpResponse::Reject;
+            }
+            return UdpResponse::Other;
 
         }
         else {
@@ -126,4 +134,5 @@ void udpReceiveResponse(const std::string& sessionId, std::uint32_t sequenceNumb
         Serial.println(error.what());
 
     }
+    return UdpResponse::Other;
 }

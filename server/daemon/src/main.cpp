@@ -1,3 +1,4 @@
+#include "alert_message.h"
 #include "alert_server.h"
 #include "application.h"
 #include "server_stats.h"
@@ -12,6 +13,7 @@
 #include <exception>
 #include <iostream>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -85,12 +87,10 @@ int main(int argc, char** argv) {
     try {
         const Options options = parse_options(argc, argv);
 
-        ReadingStore store("readings.sqlite3");
-        AlertLogic logic(store);
-        AlertServer server(store, logic, {"0.0.0.0", options.udp_port});
-        spdlog::info("UDP server listening on port {}", options.udp_port);
-
         ServerStats stats;
+        // Guards `status`: alerts are published from the receive loop, while the stop watcher
+        // below destroys the publisher.
+        std::mutex status_mutex;
         std::unique_ptr<StatusPublisher> status;
         if (options.mqtt) {
             status = std::make_unique<StatusPublisher>(options.status,
@@ -99,13 +99,25 @@ int main(int argc, char** argv) {
             spdlog::info("MQTT disabled (--no-mqtt)");
         }
 
+        // Every alert condition is also published on comcs/cell1/alerts for the Command Centre.
+        ReadingStore store("readings.sqlite3");
+        AlertLogic logic(store, [&status, &status_mutex](const AlertLogic::Alert& alert) {
+            std::lock_guard lock(status_mutex);
+            if (status) {
+                status->publish_alert(alert_json(alert));
+            }
+        });
+        AlertServer server(store, logic, {"0.0.0.0", options.udp_port});
+        spdlog::info("UDP server listening on port {}", options.udp_port);
+
         std::signal(SIGINT, request_stop);
         std::signal(SIGTERM, request_stop);
-        std::thread([&status] {
+        std::thread([&status, &status_mutex] {
             while (!stop_requested) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
             spdlog::info("Stopping");
+            std::lock_guard lock(status_mutex);
             status.reset();   // publishes "offline" and disconnects
             spdlog::shutdown();
             std::_Exit(0);

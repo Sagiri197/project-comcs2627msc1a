@@ -147,6 +147,7 @@ void StatusPublisher::run() {
                 m_heartbeat_due = false;
                 next_heartbeat = clock::now() + m_config.interval;
             }
+            publish_pending_alerts();
         }
     }
 
@@ -166,6 +167,43 @@ void StatusPublisher::publish_heartbeat() {
     const int rc = publish_text(m_client, m_heartbeat_topic, payload, 0, false);
     if (rc != MOSQ_ERR_SUCCESS) {
         spdlog::warn("MQTT heartbeat not published: {}", mosquitto_strerror(rc));
+    }
+}
+
+void StatusPublisher::publish_alert(std::string payload) {
+    std::lock_guard lock(m_alerts_mutex);
+    if (m_pending_alerts.size() >= m_config.max_pending_alerts) {
+        m_pending_alerts.pop_front();
+        spdlog::warn("MQTT alert queue full ({}); dropped the oldest alert", m_config.max_pending_alerts);
+    }
+    m_pending_alerts.push_back(std::move(payload));
+}
+
+std::size_t StatusPublisher::pending_alerts() const {
+    std::lock_guard lock(m_alerts_mutex);
+    return m_pending_alerts.size();
+}
+
+void StatusPublisher::publish_pending_alerts() {
+    std::deque<std::string> batch;
+    {
+        std::lock_guard lock(m_alerts_mutex);
+        batch.swap(m_pending_alerts);
+    }
+    while (!batch.empty()) {
+        const int rc = publish_text(m_client, m_config.alerts_topic, batch.front(), 1, false);
+        if (rc != MOSQ_ERR_SUCCESS) {
+            spdlog::warn("MQTT alert not published ({}); will retry", mosquitto_strerror(rc));
+            // Put the unsent alerts back in front of any raised meanwhile, keeping their order.
+            std::lock_guard lock(m_alerts_mutex);
+            m_pending_alerts.insert(m_pending_alerts.begin(), batch.begin(), batch.end());
+            while (m_pending_alerts.size() > m_config.max_pending_alerts) {
+                m_pending_alerts.pop_front();
+            }
+            return;
+        }
+        spdlog::info("MQTT alert published on {}", m_config.alerts_topic);
+        batch.pop_front();
     }
 }
 

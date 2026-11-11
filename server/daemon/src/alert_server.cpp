@@ -14,7 +14,7 @@ AlertServer::AlertServer(ReadingStore& store, AlertLogic& logic, std::unique_ptr
 
 AlertServer::ReceivedMessage AlertServer::receive() {
 
-    auto datagram = m_socket.recv();
+    auto datagram = m_socket->recv();
     
     try {
         auto message = common::protocol::decode(datagram.data);

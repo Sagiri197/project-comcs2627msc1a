@@ -6,6 +6,9 @@
 #include <mutex>
 #include <string>
 
+// UTC timestamp as used on MQTT, e.g. "2026-11-08T21:40:05Z".
+std::string iso_utc(std::chrono::system_clock::time_point at);
+
 // Counters the receive loop updates and the MQTT heartbeat reports. Safe to update from the
 // receive loop while the publisher thread reads them.
 class ServerStats {

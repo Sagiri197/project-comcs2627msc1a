@@ -124,7 +124,7 @@
         "type": "ui-group",
         "name": "Cell average (live)",
         "page": "ui_page",
-        "width": "6",
+        "width": "12",
         "height": "1",
         "order": 1,
         "showTitle": true,
@@ -138,7 +138,7 @@
         "type": "ui-group",
         "name": "Alerts",
         "page": "ui_page",
-        "width": "6",
+        "width": "12",
         "height": "1",
         "order": 2,
         "showTitle": true,
@@ -612,7 +612,7 @@
         "type": "function",
         "z": "tab_cc",
         "name": "Component health",
-        "func": "    // Combines MQTT Last-Will status (\"online\"/\"offline\", retained) with a data\n// watchdog: a sensor node that is \"online\" but silent for STALE_MS is STALE.\nconst STALE_MS = 5000;\n// The alert-server heartbeat is published every 5 s (--status-interval); allow a few misses.\nconst SERVER_STALE_MS = 15000;\nconst EXPECTED = env.get('EXPECTED_COMPONENTS') || 'esp32-001,esp32-002,alert-server';\nconst comps = context.get('comps') || {};\nconst now = Date.now();\nconst get = (id) => (comps[id] = comps[id] || { connection: 'unknown', lastData: 0, state: '' });\n\nEXPECTED.split(',').map((s) => s.trim()).filter(Boolean).forEach(get);\n\nif (msg.topic === 'tick') {\n    // fall through to evaluation\n} else if (msg.topic.endsWith('/heartbeat')) {\n    // alert-server heartbeat: its \"last data\" is the time of the last heartbeat\n    const id = msg.topic.split('/')[2];\n    get(id).lastData = now;\n    if (get(id).connection === 'unknown') get(id).connection = 'online';\n} else if (msg.topic.endsWith('/status')) {\n    const id = msg.topic.split('/')[2];\n    if (id === 'command-centre') return null;\n    get(id).connection = String(msg.payload).trim().toLowerCase() === 'online' ? 'online' : 'offline';\n} else if (msg.payload && msg.payload.nodeId) {\n    get(msg.payload.nodeId).lastData = msg.payload.receivedAt;\n    if (msg.payload.live && get(msg.payload.nodeId).connection === 'unknown') {\n        get(msg.payload.nodeId).connection = 'online';\n    }\n}\n\nconst notifications = [];\nconst rows = Object.keys(comps).sort().map((id) => {\n    const c = comps[id];\n    const isSensor = id !== 'alert-server';\n    const staleMs = isSensor ? STALE_MS : SERVER_STALE_MS;\n    const age = c.lastData ? now - c.lastData : null;\n    let state = 'OK';\n    if (c.connection === 'offline') state = 'OFFLINE';\n    else if (age === null || age > staleMs) state = c.lastData ? 'STALE' : 'NO DATA';\n    else if (c.connection === 'unknown') state = 'UNKNOWN';\n    if (c.state && c.state !== state && (state === 'OFFLINE' || state === 'STALE' || c.state === 'OFFLINE' || c.state === 'STALE')) {\n        notifications.push({ payload: `${id}: ${c.state} → ${state}` });\n    }\n    c.state = state;\n    return {\n        Component: id,\n        Connection: c.connection,\n        'Last data': age === null ? '—' : `${Math.round(age / 1000)} s ago`,\n        State: state\n    };\n});\ncontext.set('comps', comps);\n\nconst bad = rows.filter((r) => r.State !== 'OK').length;\nnode.status({ fill: bad ? 'red' : 'green', shape: 'dot', text: bad ? `${bad} component(s) degraded` : 'all OK' });\nreturn [{ payload: rows }, notifications.length ? notifications : null];",
+        "func": "// Combines MQTT Last-Will status (\"online\"/\"offline\", retained) with a data\n// watchdog: a sensor node that is \"online\" but silent for STALE_MS is STALE.\n// Output 1 feeds the topology diagram, output 2 the state-change popups.\nconst STALE_MS = 5000;\n// The alert-server heartbeat is published every 5 s (--status-interval); allow a few misses.\nconst SERVER_STALE_MS = 15000;\nconst EXPECTED = env.get('EXPECTED_COMPONENTS') || 'esp32-001,esp32-002,alert-server';\nconst comps = context.get('comps') || {};\nconst now = Date.now();\nconst get = (id) => (comps[id] = comps[id] || { connection: 'unknown', lastData: 0, state: '' });\n\nEXPECTED.split(',').map((s) => s.trim()).filter(Boolean).forEach(get);\n\nif (msg.topic === 'tick') {\n    // fall through to evaluation\n} else if (msg.topic.endsWith('/heartbeat')) {\n    // alert-server heartbeat: its \"last data\" is the time of the last heartbeat\n    const id = msg.topic.split('/')[2];\n    get(id).lastData = now;\n    if (get(id).connection === 'unknown') get(id).connection = 'online';\n} else if (msg.topic.endsWith('/status')) {\n    const id = msg.topic.split('/')[2];\n    if (id === 'command-centre') return null;\n    get(id).connection = String(msg.payload).trim().toLowerCase() === 'online' ? 'online' : 'offline';\n} else if (msg.payload && msg.payload.nodeId) {\n    get(msg.payload.nodeId).lastData = msg.payload.receivedAt;\n    if (msg.payload.live && get(msg.payload.nodeId).connection === 'unknown') {\n        get(msg.payload.nodeId).connection = 'online';\n    }\n}\n\nconst notifications = [];\nconst components = Object.keys(comps).sort().map((id) => {\n    const c = comps[id];\n    const isSensor = id !== 'alert-server';\n    const staleMs = isSensor ? STALE_MS : SERVER_STALE_MS;\n    const age = c.lastData ? now - c.lastData : null;\n    let state = 'OK';\n    if (c.connection === 'offline') state = 'OFFLINE';\n    else if (age === null || age > staleMs) state = c.lastData ? 'STALE' : 'NO DATA';\n    else if (c.connection === 'unknown') state = 'UNKNOWN';\n    if (c.state && c.state !== state && (state === 'OFFLINE' || state === 'STALE' || c.state === 'OFFLINE' || c.state === 'STALE')) {\n        notifications.push({ payload: `${id}: ${c.state} → ${state}` });\n    }\n    c.state = state;\n    return {\n        id,\n        kind: isSensor ? 'sensor' : 'server',\n        connection: c.connection,\n        lastData: age === null ? null : `${Math.round(age / 1000)} s ago`,\n        ageMs: age,\n        state\n    };\n});\ncontext.set('comps', comps);\n\nconst bad = components.filter((r) => r.state !== 'OK').length;\nnode.status({ fill: bad ? 'red' : 'green', shape: 'dot', text: bad ? `${bad} component(s) degraded` : 'all OK' });\nreturn [{\n    payload: {\n        components,\n        broker: flow.get('brokerState') || 'Connecting…',\n        ccHost: env.get('CC_HOST') || '192.168.50.2 · cc.comcs.lan',\n        brokerPort: env.get('MQTT_PORT') || '1883'\n    }\n}, notifications.length ? notifications : null];",
         "outputs": 2,
         "timeout": 0,
         "noerr": 0,
@@ -623,37 +623,34 @@
         "y": 500,
         "wires": [
             [
-                "ui_tbl_health"
+                "ui_topology"
             ],
             [
                 "ui_notify"
             ]
         ],
         "outputLabels": [
-            "health table",
+            "topology",
             "state changes"
         ]
     },
     {
-        "id": "ui_tbl_health",
-        "type": "ui-table",
+        "id": "ui_topology",
+        "type": "ui-template",
         "z": "tab_cc",
         "group": "g_health",
-        "name": "health",
-        "label": "Components",
+        "page": "",
+        "ui": "",
+        "name": "system topology",
         "order": 1,
-        "width": "6",
+        "width": "12",
         "height": "0",
-        "maxrows": 0,
+        "head": "",
+        "format": "<template>\n  <div class=\"topo\">\n    <svg :viewBox=\"`0 0 ${L.W} ${L.H}`\" preserveAspectRatio=\"xMidYMid meet\" :style=\"{ aspectRatio: L.W + ' / ' + L.H }\" role=\"img\" aria-label=\"System topology\">\n      <!-- links first so boxes sit on top -->\n      <path v-for=\"l in links\" :key=\"l.key\" :d=\"l.d\"\n            :class=\"['lnk', l.kind, 'lv-' + l.level]\" />\n      <text v-for=\"t in linkLabels\" :key=\"t.key\" :x=\"t.x\" :y=\"t.y\" class=\"lnk-label\">{{ t.text }}</text>\n\n      <g v-for=\"b in boxes\" :key=\"b.id\" :transform=\"`translate(${b.x},${b.y})`\">\n        <rect :width=\"b.w\" :height=\"b.h\" rx=\"14\" :class=\"['box', 'lv-' + b.level]\" />\n        <rect x=\"0\" y=\"14\" width=\"5\" :height=\"b.h - 28\" rx=\"2.5\" :class=\"['bar', 'lv-' + b.level]\" />\n        <text x=\"22\" y=\"30\" class=\"ttl\">{{ b.title }}</text>\n        <text x=\"22\" y=\"50\" class=\"sub\">{{ b.sub }}</text>\n        <g transform=\"translate(22,62)\">\n          <rect :width=\"pillW(b.label)\" height=\"22\" rx=\"11\" :class=\"['pill', 'lv-' + b.level]\" />\n          <circle cx=\"12\" cy=\"11\" r=\"4\" :class=\"['dot', 'lv-' + b.level]\" />\n          <text x=\"22\" y=\"15.5\" :class=\"['pill-t', 'lv-' + b.level]\">{{ b.label }}</text>\n        </g>\n        <g v-if=\"b.id === '_as'\" :transform=\"`translate(${b.w - 152},64)`\">\n          <title>Heartbeat: {{ hb.left }} of 5 s left</title>\n          <rect v-for=\"i in 5\" :key=\"i\" :x=\"(i - 1) * 26\" y=\"0\" width=\"22\" height=\"18\" rx=\"4\"\n                :fill=\"hb.left === 0 ? hb.color : (i <= hb.left ? hb.color : '#e5e7eb')\" />\n        </g>\n      </g>\n    </svg>\n\n    <div class=\"legend\">\n      <span><svg width=\"34\" height=\"8\"><line x1=\"0\" y1=\"4\" x2=\"34\" y2=\"4\" class=\"lg-line\" /></svg>MQTT</span>\n      <span><svg width=\"34\" height=\"8\"><line x1=\"0\" y1=\"4\" x2=\"34\" y2=\"4\" class=\"lg-line udp\" /></svg>UDP readings</span>\n      <span><i class=\"lg-dot lv-ok\"></i>OK</span>\n      <span><i class=\"lg-dot lv-warn\"></i>Degraded / stale</span>\n      <span><i class=\"lg-dot lv-bad\"></i>Offline / no data</span>\n    </div>\n  </div>\n</template>\n\n<script>\nexport default {\n  computed: {\n    p () { return (this.msg && this.msg.payload) || { components: [], broker: 'Connecting…' } },\n    sensors () { return (this.p.components || []).filter(c => c.kind === 'sensor') },\n    server () {\n      return (this.p.components || []).find(c => c.kind === 'server') ||\n        { id: 'alert-server', state: 'NO DATA', connection: 'unknown', lastData: null }\n    },\n    // heartbeat every 5 s: bar drains 5 -> 0 seconds left\n    hb () {\n      const age = this.server.ageMs\n      const left = age == null ? 0 : Math.max(0, Math.min(5, 5 - Math.floor(age / 1000)))\n      const colors = ['#f2a7a3', '#d32f2f', '#f0cf6b', '#e0a100', '#86c995', '#2e9e44']\n      return { left, color: colors[left] }\n    },\n    brokerLevel () {\n      const b = this.p.broker || ''\n      return b === 'Connected' ? 'ok' : b.startsWith('Connecting') ? 'warn' : 'bad'\n    },\n    // geometry: sensors in the left column, Command Centre / broker / Alert Server stacked on the right\n    L () {\n      const n = Math.max(this.sensors.length, 1)\n      const bh = 96, gap = 24, W = 960\n      const stack = n * bh + (n - 1) * gap\n      const H = Math.max(stack + 60, 3 * bh + 2 * 70 + 60)\n      return {\n        W, H, bh,\n        sx: 40, sw: 260, sy0: (H - stack) / 2, gap,\n        rx: 640, rw: 280,\n        ccY: 30, brY: (H - bh) / 2, asY: H - 30 - bh\n      }\n    },\n    boxes () {\n      const L = this.L\n      const esp = this.sensors.map((s, i) => ({\n        id: s.id, x: L.sx, y: L.sy0 + i * (L.bh + L.gap), w: L.sw, h: L.bh,\n        title: s.id,\n        sub: s.lastData ? `last data ${s.lastData}` : `MQTT ${s.connection} · no data yet`,\n        label: s.state === 'OK' ? 'ONLINE' : s.state,\n        level: this.levelOf(s.state)\n      }))\n      const as = this.server\n      return esp.concat([\n        { id: '_cc', x: L.rx, y: L.ccY, w: L.rw, h: L.bh, title: 'Command Centre',\n          sub: this.p.ccHost || '', label: 'ONLINE', level: 'ok' },\n        { id: '_br', x: L.rx, y: L.brY, w: L.rw, h: L.bh, title: 'MQTT broker',\n          sub: `mosquitto · port ${this.p.brokerPort || 1883}`,\n          label: (this.p.broker || '').toUpperCase(), level: this.brokerLevel },\n        { id: '_as', x: L.rx, y: L.asY, w: L.rw, h: L.bh, title: 'Alert Server',\n          sub: as.lastData ? `heartbeat ${as.lastData}` : 'no heartbeat yet',\n          label: as.state === 'OK' ? 'ONLINE' : as.state, level: this.levelOf(as.state) }\n      ])\n    },\n    links () {\n      const L = this.L, out = []\n      const n = this.sensors.length\n      const x1 = L.sx + L.sw, x2 = L.rx, mx = (x1 + x2) / 2\n      const spread = Math.min(14, 56 / Math.max(n, 1))\n      const asLv = this.levelOf(this.server.state)\n      const curve = (ya, yb) => `M ${x1} ${ya} C ${mx} ${ya}, ${mx} ${yb}, ${x2} ${yb}`\n      this.sensors.forEach((s, i) => {\n        const cy = L.sy0 + i * (L.bh + L.gap) + L.bh / 2\n        const off = (i - (n - 1) / 2) * spread\n        const lv = this.levelOf(s.state)\n        out.push({ key: 'm' + s.id, kind: 'mqtt', level: this.worst(lv, this.brokerLevel),\n          d: curve(cy - 14, L.brY + L.bh / 2 + off) })\n        out.push({ key: 'u' + s.id, kind: 'udp', level: this.worst(lv, asLv),\n          d: curve(cy + 14, L.asY + L.bh / 2 + off) })\n      })\n      const cx = L.rx + L.rw / 2\n      out.push({ key: 'cc', kind: 'mqtt', level: this.brokerLevel,\n        d: `M ${cx} ${L.brY} L ${cx} ${L.ccY + L.bh}` })\n      out.push({ key: 'as', kind: 'mqtt', level: this.worst(asLv, this.brokerLevel),\n        d: `M ${cx} ${L.asY} L ${cx} ${L.brY + L.bh}` })\n      return out\n    },\n    linkLabels () {\n      const L = this.L, x = L.rx + L.rw / 2 + 10\n      return [\n        { key: 'cc', x, y: (L.ccY + L.bh + L.brY) / 2 + 4, text: 'MQTT subscribe' },\n        { key: 'as', x, y: (L.brY + L.bh + L.asY) / 2 + 4, text: 'MQTT alerts / heartbeat' }\n      ]\n    }\n  },\n  methods: {\n    worst (...lv) {\n      const R = { ok: 0, warn: 1, bad: 2 }\n      return lv.reduce((a, b) => (R[b] > R[a] ? b : a), 'ok')\n    },\n    levelOf (state) {\n      return state === 'OK' ? 'ok' : (state === 'OFFLINE' || state === 'NO DATA') ? 'bad' : 'warn'\n    },\n    pillW (label) { return 32 + String(label).length * 7.6 }\n  }\n}\n</script>\n\n<style>\n.topo { width: 100%; font-family: inherit; }\n.topo svg { display: block; width: 100%; height: auto; max-width: 1100px; margin: 0 auto; }\n.topo .box { fill: #ffffff; stroke-width: 2; }\n.topo .box.lv-ok   { stroke: #2e9e44; }\n.topo .box.lv-warn { stroke: #e0a100; }\n.topo .box.lv-bad  { stroke: #d32f2f; fill: #fffafa; }\n.topo .bar.lv-ok   { fill: #2e9e44; }\n.topo .bar.lv-warn { fill: #e0a100; }\n.topo .bar.lv-bad  { fill: #d32f2f; }\n.topo .ttl { font-size: 17px; font-weight: 600; fill: #1f2933; }\n.topo .sub { font-size: 12.5px; fill: #6b7280; }\n.topo .pill.lv-ok   { fill: #e6f4ea; }\n.topo .pill.lv-warn { fill: #fff4d6; }\n.topo .pill.lv-bad  { fill: #fdecea; }\n.topo .dot.lv-ok   { fill: #2e9e44; }\n.topo .dot.lv-warn { fill: #e0a100; }\n.topo .dot.lv-bad  { fill: #d32f2f; }\n.topo .pill-t { font-size: 12px; font-weight: 700; letter-spacing: .04em; }\n.topo .pill-t.lv-ok   { fill: #1e7b34; }\n.topo .pill-t.lv-warn { fill: #8a6100; }\n.topo .pill-t.lv-bad  { fill: #b3261e; }\n\n.topo .lnk { fill: none; stroke-width: 3; stroke-linecap: round; transition: stroke .3s; }\n.topo .lnk.lv-ok   { stroke: #2e9e44; }\n.topo .lnk.lv-warn { stroke: #e0a100; }\n.topo .lnk.lv-bad  { stroke: #d32f2f; opacity: .75; }\n.topo .lnk.mqtt { stroke-dasharray: 12 6; }\n.topo .lnk.udp { stroke-width: 3.5; stroke-dasharray: 0.1 9; }\n.topo .lnk.mqtt.lv-ok, .topo .lnk.mqtt.lv-warn { animation: topo-flow-m 1s linear infinite; }\n.topo .lnk.udp.lv-ok, .topo .lnk.udp.lv-warn { animation: topo-flow-u 1s linear infinite; }\n@keyframes topo-flow-m { to { stroke-dashoffset: -36; } }\n@keyframes topo-flow-u { to { stroke-dashoffset: -27; } }\n.topo .lnk-label { font-size: 11.5px; fill: #6b7280; }\n\n.topo .legend { display: flex; flex-wrap: wrap; gap: 8px 22px; justify-content: center;\n  font-size: 12.5px; color: #4b5563; margin-top: 6px; }\n.topo .legend span { white-space: nowrap; display: inline-flex; align-items: center; gap: 7px; }\n.topo .lg-line { stroke: #4b5563; stroke-width: 3; stroke-dasharray: 8 4; }\n.topo .lg-line.udp { stroke-width: 3.5; stroke-linecap: round; stroke-dasharray: 0.1 7; }\n.topo .lg-dot { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }\n.topo .lg-dot.lv-ok { background: #2e9e44; }\n.topo .lg-dot.lv-warn { background: #e0a100; }\n.topo .lg-dot.lv-bad { background: #d32f2f; }\n</style>\n",
+        "storeOutMessages": true,
         "passthru": false,
-        "autocols": true,
-        "showSearch": false,
-        "deselect": true,
-        "selectionType": "none",
-        "columns": [],
-        "mobileBreakpoint": "sm",
-        "mobileBreakpointType": "defaults",
-        "action": "replace",
+        "resendOnRefresh": true,
+        "templateScope": "local",
         "className": "",
         "x": 700,
         "y": 480,
@@ -684,7 +681,7 @@
         "type": "function",
         "z": "tab_cc",
         "name": "Broker state",
-        "func": "    // Status events from the mqtt-in nodes: green = connected, red = disconnected, yellow = connecting.\nconst fill = msg.status && msg.status.fill;\nconst text = fill === 'green' ? 'Connected' : fill === 'yellow' ? 'Connecting…' : 'DISCONNECTED';\nif (context.get('last') === text) return null;\ncontext.set('last', text);\nreturn { payload: text };",
+        "func": "// Status events from the mqtt-in nodes: green = connected, red = disconnected, yellow = connecting.\n// Stored in flow context; \"Component health\" picks it up on the next 1 s tick.\nconst fill = msg.status && msg.status.fill;\nconst text = fill === 'green' ? 'Connected' : fill === 'yellow' ? 'Connecting…' : 'DISCONNECTED';\nflow.set('brokerState', text);\nreturn null;",
         "outputs": 1,
         "timeout": 0,
         "noerr": 0,
@@ -694,34 +691,8 @@
         "x": 400,
         "y": 560,
         "wires": [
-            [
-                "ui_t_broker"
-            ]
+            []
         ]
-    },
-    {
-        "id": "ui_t_broker",
-        "type": "ui-text",
-        "z": "tab_cc",
-        "group": "g_health",
-        "order": 2,
-        "width": "6",
-        "height": "1",
-        "name": "broker state",
-        "label": "MQTT broker",
-        "format": "{{msg.payload}}",
-        "layout": "row-spread",
-        "style": false,
-        "font": "",
-        "fontSize": 16,
-        "color": "#717171",
-        "wrapText": false,
-        "className": "",
-        "value": "payload",
-        "valueType": "msg",
-        "x": 700,
-        "y": 560,
-        "wires": []
     },
     {
         "id": "c_alerts",
@@ -755,51 +726,12 @@
         ]
     },
     {
-        "id": "ui_btn_ack",
-        "type": "ui-button",
-        "z": "tab_cc",
-        "group": "g_alert",
-        "name": "acknowledge",
-        "label": "Acknowledge",
-        "order": 2,
-        "width": "2",
-        "height": "1",
-        "emulateClick": false,
-        "tooltip": "",
-        "color": "",
-        "bgcolor": "",
-        "className": "",
-        "icon": "check",
-        "iconPosition": "left",
-        "payload": "ack",
-        "payloadType": "str",
-        "topic": "ack",
-        "topicType": "str",
-        "buttonColor": "",
-        "textColor": "",
-        "iconColor": "",
-        "enableClick": true,
-        "enablePointerdown": false,
-        "pointerdownPayload": "",
-        "pointerdownPayloadType": "str",
-        "enablePointerup": false,
-        "pointerupPayload": "",
-        "pointerupPayloadType": "str",
-        "x": 120,
-        "y": 780,
-        "wires": [
-            [
-                "f_alert"
-            ]
-        ]
-    },
-    {
         "id": "f_alert",
         "type": "function",
         "z": "tab_cc",
         "name": "Process alert",
-        "func": "    // Expected payload: Smart Data Model \"Alert\" (key-values). Unknown shapes are still shown.\nconst MAX_ROWS = 50;\nconst log = context.get('log') || [];\nlet unacked = context.get('unacked') || 0;\nconst indicator = () => ({ payload: {\n    active: unacked > 0,\n    text: unacked > 0 ? `${unacked} unacknowledged · last: ${log[0].Description}` : 'No unacknowledged alerts'\n} });\n\nif (msg.topic === 'ack') {\n    unacked = 0;\n    context.set('unacked', 0);\n    node.status({ fill: 'green', shape: 'dot', text: 'acknowledged' });\n    return [null, null, indicator()];\n}\n\nlet a;\ntry {\n    a = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch (e) {\n    a = { description: String(msg.payload) };\n}\nif (!a || typeof a !== 'object') a = { description: String(a) };\n\n// Deduplicate QoS 1 redeliveries by Alert id.\nconst ids = context.get('ids') || [];\nif (a.id && ids.includes(a.id)) return null;\nif (a.id) { ids.push(a.id); if (ids.length > 500) ids.shift(); context.set('ids', ids); }\n\nconst when = a.dateIssued ? new Date(a.dateIssued) : new Date();\nconst row = {\n    Time: isNaN(when) ? String(a.dateIssued) : when.toLocaleString('pt-PT'),\n    Severity: a.severity || 'unknown',\n    Category: a.subCategory || a.category || '',\n    Description: a.description || JSON.stringify(a).slice(0, 200),\n    Source: (a.alertSource || '').replace('urn:ngsi-ld:Device:', '')\n};\nlog.unshift(row);\nif (log.length > MAX_ROWS) log.length = MAX_ROWS;\nunacked += 1;\ncontext.set('log', log);\ncontext.set('unacked', unacked);\nnode.status({ fill: 'red', shape: 'dot', text: `${unacked} unacked: ${row.Description}` });\n\nreturn [\n    { payload: `⚠ [${row.Severity}] ${row.Description}` },\n    { payload: log },\n    indicator()\n];",
-        "outputs": 3,
+        "func": "// Alert log for the dashboard panel. Input: Smart Data Model \"Alert\" (key-values) on\n// comcs/cell1/alerts, or {topic:'ack', payload:{id}} / {topic:'ack-all'} from the panel.\n// Outputs: [popup, alerts panel].\nconst MAX_ALERTS = 1000;\nlet alerts = context.get('alerts') || [];\n\nconst panel = () => ({ payload: { alerts, unacked: alerts.filter(a => !a.acked).length } });\nconst showStatus = () => {\n    const unacked = alerts.filter(a => !a.acked).length;\n    node.status(unacked\n        ? { fill: 'red', shape: 'dot', text: `${unacked} unacked of ${alerts.length}` }\n        : { fill: 'green', shape: 'dot', text: `all acknowledged (${alerts.length})` });\n};\n\nif (msg.topic === 'ack' || msg.topic === 'ack-all') {\n    const id = msg.topic === 'ack' && msg.payload && typeof msg.payload === 'object' ? msg.payload.id : null;\n    const now = new Date().toISOString();\n    for (const a of alerts) {\n        if (!a.acked && (id === null || a.id === id)) {\n            a.acked = true;\n            a.ackedAt = now;\n        }\n    }\n    context.set('alerts', alerts);\n    showStatus();\n    return [null, panel()];\n}\n\nlet a;\ntry {\n    a = typeof msg.payload === 'string' ? JSON.parse(msg.payload) : msg.payload;\n} catch (e) {\n    a = { description: String(msg.payload) };\n}\nif (!a || typeof a !== 'object') a = { description: String(a) };\n\n// Deduplicate QoS 1 redeliveries and resent readings by Alert id.\nconst ids = context.get('ids') || [];\nif (a.id && ids.includes(a.id)) return null;\nif (a.id) { ids.push(a.id); if (ids.length > 2 * MAX_ALERTS) ids.shift(); context.set('ids', ids); }\n\nconst issued = a.dateIssued && !isNaN(new Date(a.dateIssued)) ? a.dateIssued : new Date().toISOString();\nconst row = {\n    id: a.id || `local:${Date.now()}:${Math.random().toString(36).slice(2, 8)}`,\n    issued,\n    severity: String(a.severity || 'unknown').toLowerCase(),\n    category: a.subCategory || a.category || '',\n    description: a.description || JSON.stringify(a).slice(0, 200),\n    source: (a.alertSource || '').replace('urn:ngsi-ld:Device:', ''),\n    acked: false\n};\nalerts.unshift(row);\nif (alerts.length > MAX_ALERTS) alerts.length = MAX_ALERTS;\ncontext.set('alerts', alerts);\nshowStatus();\n\nreturn [\n    { payload: `⚠ [${row.severity}] ${row.description}` },\n    panel()\n];\n",
+        "outputs": 2,
         "timeout": 0,
         "noerr": 0,
         "initialize": "",
@@ -812,16 +744,38 @@
                 "ui_notify"
             ],
             [
-                "ui_tbl_alerts"
-            ],
-            [
-                "ui_indicator"
+                "ui_alerts"
             ]
         ],
         "outputLabels": [
             "notification",
-            "alert log",
-            "indicator"
+            "alerts panel"
+        ]
+    },
+    {
+        "id": "ui_alerts",
+        "type": "ui-template",
+        "z": "tab_cc",
+        "group": "g_alert",
+        "page": "",
+        "ui": "",
+        "name": "alerts panel",
+        "order": 1,
+        "width": "12",
+        "height": "0",
+        "head": "",
+        "format": "<template>\n  <div class=\"cc-alerts\">\n    <div class=\"cc-head\">\n      <v-icon :color=\"unacked ? 'red' : 'green'\" size=\"x-large\">{{ unacked ? 'mdi-alert' : 'mdi-check-circle' }}</v-icon>\n      <div class=\"cc-status\">\n        <div class=\"text-h6\" :style=\"{ color: unacked ? '#c62828' : '#2e7d32' }\">{{ unacked ? 'ALERT' : 'Normal' }}</div>\n        <div class=\"text-caption\">{{ summary }}</div>\n      </div>\n      <v-btn v-if=\"unacked\" color=\"primary\" variant=\"flat\" prepend-icon=\"mdi-check-all\" @click=\"ackAll\">Acknowledge all</v-btn>\n      <v-btn variant=\"text\" :icon=\"open ? 'mdi-chevron-up' : 'mdi-chevron-down'\" :title=\"open ? 'Collapse' : 'Expand'\" @click=\"toggle\"></v-btn>\n    </div>\n\n    <div v-show=\"open\" class=\"cc-list\" @scroll=\"onScroll\">\n      <div v-if=\"!alerts.length\" class=\"cc-empty\">No alerts received</div>\n      <div v-for=\"a in shown\" :key=\"a.id\" class=\"cc-row\" :class=\"{ 'cc-acked-row': a.acked }\">\n        <div class=\"cc-time\" :title=\"a.issued\">\n          <span class=\"cc-hm\">{{ hm(a.issued) }}</span><span class=\"cc-ss\">:{{ ss(a.issued) }}</span>\n          <div class=\"cc-day\">{{ day(a.issued) }}</div>\n        </div>\n        <span class=\"cc-sev\" :class=\"'cc-sev-' + sevClass(a.severity)\">{{ a.severity }}</span>\n        <div class=\"cc-body\">\n          <div class=\"cc-desc\">{{ a.description }}</div>\n          <div class=\"cc-meta\">{{ [a.category, a.source].filter(Boolean).join(' · ') }}</div>\n        </div>\n        <v-btn v-if=\"!a.acked\" size=\"small\" variant=\"tonal\" color=\"primary\" prepend-icon=\"mdi-check\" @click=\"ack(a.id)\">Acknowledge</v-btn>\n        <span v-else class=\"cc-ack-done\" :title=\"'Acknowledged ' + (a.ackedAt || '')\">\n          <v-icon size=\"small\" color=\"green\">mdi-check</v-icon> {{ a.ackedAt ? hm(a.ackedAt) : '' }}\n        </span>\n      </div>\n      <div v-if=\"shown.length < alerts.length\" class=\"cc-more\">Scroll for {{ alerts.length - shown.length }} more</div>\n    </div>\n  </div>\n</template>\n\n<script>\nexport default {\n  data () {\n    let open = true;\n    try { open = localStorage.getItem('comcs-alerts-open') !== 'false'; } catch (e) {}\n    return { open, limit: 25 };\n  },\n  computed: {\n    state () { return (this.msg && this.msg.payload) || {}; },\n    alerts () { return Array.isArray(this.state.alerts) ? this.state.alerts : []; },\n    unacked () { return this.state.unacked || 0; },\n    shown () { return this.alerts.slice(0, this.limit); },\n    summary () {\n      if (!this.alerts.length) return 'No alerts received';\n      if (!this.unacked) return `All ${this.alerts.length} alert(s) acknowledged`;\n      const last = this.alerts.find(a => !a.acked);\n      return `${this.unacked} unacknowledged · last: ${last ? last.description : ''}`;\n    }\n  },\n  methods: {\n    pad (n) { return String(n).padStart(2, '0'); },\n    date (iso) { const d = new Date(iso); return isNaN(d) ? null : d; },\n    hm (iso) { const d = this.date(iso); return d ? `${this.pad(d.getHours())}:${this.pad(d.getMinutes())}` : '--:--'; },\n    ss (iso) { const d = this.date(iso); return d ? this.pad(d.getSeconds()) : '--'; },\n    day (iso) {\n      const d = this.date(iso);\n      if (!d) return '';\n      const today = new Date();\n      const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);\n      if (d.toDateString() === today.toDateString()) return 'Today';\n      if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';\n      return `${this.pad(d.getDate())}/${this.pad(d.getMonth() + 1)}/${d.getFullYear()}`;\n    },\n    sevClass (s) {\n      if (s === 'low' || s === 'informational') return 'low';\n      if (s === 'medium') return 'medium';\n      if (s === 'high' || s === 'critical') return 'high';\n      return 'other';\n    },\n    ack (id) { this.send({ topic: 'ack', payload: { id } }); },\n    ackAll () { this.send({ topic: 'ack-all', payload: 'all' }); },\n    toggle () {\n      this.open = !this.open;\n      try { localStorage.setItem('comcs-alerts-open', String(this.open)); } catch (e) {}\n    },\n    // Endless scrolling: render the next page when the list is scrolled near its end.\n    onScroll (e) {\n      const el = e.target;\n      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 60 && this.limit < this.alerts.length) {\n        this.limit += 25;\n      }\n    }\n  }\n}\n</script>\n\n<style scoped>\n.cc-alerts { width: 100%; }\n.cc-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }\n.cc-status { min-width: 0; flex: 1 1 200px; }\n.cc-status .text-caption { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }\n.cc-list { max-height: 420px; overflow-y: auto; margin-top: 8px; border-top: 1px solid #e0e0e0; }\n.cc-empty, .cc-more { padding: 12px; text-align: center; color: #757575; font-size: 0.85rem; }\n.cc-row { display: flex; align-items: center; gap: 14px; padding: 8px 4px; border-bottom: 1px solid #eeeeee; flex-wrap: wrap; }\n.cc-acked-row { opacity: 0.55; }\n.cc-time { width: 78px; flex: none; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }\n.cc-hm { font-size: 1.15rem; font-weight: 600; }\n.cc-ss { font-size: 0.75rem; color: #616161; }\n.cc-day { font-size: 0.7rem; color: #757575; }\n/* Excel conditional-formatting cell styles: Good / Neutral / Bad */\n.cc-sev { flex: none; min-width: 72px; text-align: center; padding: 2px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; text-transform: capitalize; }\n.cc-sev-low { background: #c6efce; color: #006100; }\n.cc-sev-medium { background: #ffeb9c; color: #9c5700; }\n.cc-sev-high { background: #ffc7ce; color: #9c0006; }\n.cc-sev-other { background: #eeeeee; color: #424242; }\n.cc-body { flex: 1 1 240px; min-width: 0; }\n.cc-desc { font-size: 0.9rem; }\n.cc-meta { font-size: 0.75rem; color: #757575; }\n.cc-ack-done { font-size: 0.75rem; color: #2e7d32; white-space: nowrap; }\n</style>\n",
+        "storeOutMessages": true,
+        "passthru": false,
+        "resendOnRefresh": true,
+        "templateScope": "local",
+        "className": "",
+        "x": 610,
+        "y": 760,
+        "wires": [
+            [
+                "f_alert"
+            ]
         ]
     },
     {
@@ -844,57 +798,6 @@
         "className": "",
         "x": 620,
         "y": 700,
-        "wires": [
-            []
-        ]
-    },
-    {
-        "id": "ui_tbl_alerts",
-        "type": "ui-table",
-        "z": "tab_cc",
-        "group": "g_alert",
-        "name": "alert log",
-        "label": "Recent alerts",
-        "order": 3,
-        "width": "6",
-        "height": "0",
-        "maxrows": 8,
-        "passthru": false,
-        "autocols": true,
-        "showSearch": false,
-        "deselect": true,
-        "selectionType": "none",
-        "columns": [],
-        "mobileBreakpoint": "sm",
-        "mobileBreakpointType": "defaults",
-        "action": "replace",
-        "className": "",
-        "x": 630,
-        "y": 740,
-        "wires": [
-            []
-        ]
-    },
-    {
-        "id": "ui_indicator",
-        "type": "ui-template",
-        "z": "tab_cc",
-        "group": "g_alert",
-        "page": "",
-        "ui": "",
-        "name": "alert indicator",
-        "order": 1,
-        "width": "4",
-        "height": "2",
-        "head": "",
-        "format": "<template>\n  <div class=\"d-flex align-center\" style=\"gap: 12px\">\n    <v-icon :color=\"active ? 'red' : 'green'\" size=\"x-large\">{{ active ? 'mdi-alert' : 'mdi-check-circle' }}</v-icon>\n    <div>\n      <div class=\"text-h6\" :style=\"{ color: active ? '#d32f2f' : '#2e9e44' }\">{{ active ? 'ALERT' : 'Normal' }}</div>\n      <div class=\"text-caption\">{{ text }}</div>\n    </div>\n  </div>\n</template>\n<script>\nexport default {\n  computed: {\n    active () { return !!(this.msg && this.msg.payload && this.msg.payload.active) },\n    text () { return (this.msg && this.msg.payload && this.msg.payload.text) || 'No unacknowledged alerts' }\n  }\n}\n</script>",
-        "storeOutMessages": true,
-        "passthru": false,
-        "resendOnRefresh": true,
-        "templateScope": "local",
-        "className": "",
-        "x": 640,
-        "y": 780,
         "wires": [
             []
         ]

@@ -62,16 +62,21 @@ void mqttStart() {
     esp_mqtt_client_start(client);   // connects and reconnects in its own task
 }
 
-void mqttPublishReading(const std::string& json) {
+bool mqttIsConnected() {
+    return client != nullptr && connected;
+}
+
+bool mqttPublishReading(const std::string& json) {
     if (client == nullptr) {
-        return;
+        return false;
     }
     const int msgId = esp_mqtt_client_enqueue(client, weatherTopic.c_str(), json.data(),
                                               static_cast<int>(json.size()), 1, 0, true);
     if (msgId < 0) {
         Serial.println("MQTT publish failed (outbox full?)");
-    } else {
-        Serial.printf("MQTT queued msg %d on %s%s\n", msgId, weatherTopic.c_str(),
-                      connected ? "" : " (broker offline, will retry)");
+        return false;
     }
+    Serial.printf("MQTT queued msg %d on %s%s\n", msgId, weatherTopic.c_str(),
+                  connected ? "" : " (broker offline, will retry)");
+    return true;
 }

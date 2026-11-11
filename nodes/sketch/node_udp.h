@@ -11,6 +11,9 @@ void udpBegin();
 // Sends one datagram to node::config.server_address:server_port.
 bool udpSend(const std::string& datagram);
 
-// Polls for a server response (non-blocking) and handles ACK / Reject. The ACK is checked
-// against the identity of the reading that was last sent.
-void udpReceiveResponse(const std::string& sessionId, std::uint32_t sequenceNumber);
+enum class UdpResponse { None, Ack, Reject, Other };
+
+// Polls for a server response (non-blocking) and handles ACK / Reject. Returns Ack / Reject
+// only when the response matches the given reading identity; a response for another
+// reading (e.g. a late ACK of an earlier retry) returns Other.
+UdpResponse udpReceiveResponse(const std::string& sessionId, std::uint32_t sequenceNumber);

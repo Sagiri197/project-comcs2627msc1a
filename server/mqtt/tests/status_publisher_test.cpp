@@ -46,3 +46,18 @@ TEST(StatusPublisher, StopsImmediatelyAfterConstruction) {
     { StatusPublisher publisher(unreachable_broker(), [] { return std::string("{}"); }); }
     EXPECT_LT(std::chrono::steady_clock::now() - started, 2s);
 }
+
+// Alerts raised while the broker is down are kept for later, bounded by max_pending_alerts.
+TEST(StatusPublisher, QueuesAlertsWhileBrokerUnreachable) {
+    auto config = unreachable_broker();
+    config.max_pending_alerts = 2;
+    StatusPublisher publisher(config, [] { return std::string("{}"); });
+
+    publisher.publish_alert(R"({"description":"one"})");
+    publisher.publish_alert(R"({"description":"two"})");
+    publisher.publish_alert(R"({"description":"three"})");
+    std::this_thread::sleep_for(300ms);
+
+    EXPECT_FALSE(publisher.connected());
+    EXPECT_EQ(publisher.pending_alerts(), 2u);
+}

@@ -10,6 +10,7 @@ legend right
   |= Line |= Protocol |
   | <color:black>━━</color> | MQTT |
   | <color:red>━━</color> | UDP (JSON datagrams, protocol v1) |
+  | <color:blue>╍╍</color> | BLE (node-to-node) |
   QoS 1 readings are stored, then answered
   with an ACK / reject to the sending ESP32.
   All devices are Wi-Fi clients of the AP
@@ -48,8 +49,12 @@ ESP1 -[#red]up-> UDP : UDP reading
 ESP2 -[#red]up-> UDP : UDP reading
 ESP3 -[#red]up-> UDP : UDP reading
 
+' BLE: peer links between neighbouring nodes inside the work cell
+ESP1 <-[#blue,dashed]right-> ESP2 : BLE
+ESP2 <-[#blue,dashed]right-> ESP3 : BLE
+
 ' Alert Server internals and alert forwarding over MQTT
-UDP -right-> DB : store
+ALERT -right-> DB : store
 UDP -up-> ALERT : readings
 ALERT -[#black]up-> BROKER : MQTT alerts
 
