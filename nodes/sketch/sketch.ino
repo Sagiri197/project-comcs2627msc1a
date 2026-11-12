@@ -1,80 +1,37 @@
-
 #include <WiFi.h>
 #include <esp_system.h>
 
-#include "src/common/protocol.h"
-#include "src/config.h"
+#include "../../common/protocol.h"
+#include "../config.h"
 
-#include "src/hardware/node_dht.h"
-#include "src/hardware/node_display.h"
-#include "src/hardware/node_status_led.h"
-#include "src/communication/node_mqtt.h"
-#include "src/communication/node_udp.h"
+#include "node_dht.h"
+#include "node_mqtt.h"
+#include "node_spool.h"
+#include "node_udp.h"
 
 #include <string>
-#include <cmath>
 #include <ctime>
+#include <variant>
 
 using namespace common::protocol;
 
 std::string sessionId;
 uint32_t sequenceNumber = 0;
 bool timeSynchronized = false;
-bool sensorError = false;
-bool transmissionError = false;
 
-DhtSensor* sensor = nullptr;
-MqttClient mqtt(
-    node::config.node_id,
-    node::config.mqtt_host,
-    node::config.mqtt_port
-);
-UdpTransport udp(
-    node::config.local_port,
-    node::config.server_address,
-    node::config.server_port
-);
-StatusLed* statusLed = nullptr;
-TemperatureDisplay* display = nullptr;
+// Status rolling window (one per link, so a reading delivered on one link is not resent on
+// it when only the other link was down). Kept in SPIFFS: survives a restart.
+Spool mqttSpool("/spool_mqtt.bin", node::spool_capacity);
+Spool udpSpool("/spool_udp.bin", node::spool_capacity);
 
-void updateStatusLed() {
-    if (statusLed == nullptr) {
-        return;
-    }
-    statusLed->update(
-        WiFi.status() == WL_CONNECTED,
-        sensorError,
-        transmissionError,
-        timeSynchronized,
-        mqtt.isConnected()
-    );
-}
+// Readings replayed per loop iteration and link, so a long backlog does not stall the
+// sensor loop or flood the MQTT outbox.
+constexpr int replay_batch = 5;
 
-void initializeHardware() {
-    if (node::config.dht != nullptr) {
-        static DhtSensor configuredSensor(*node::config.dht);
-        sensor = &configuredSensor;
-        sensor->begin();
-    }
-    if (node::config.status_led != nullptr) {
-        static StatusLed configuredStatusLed(*node::config.status_led);
-        statusLed = &configuredStatusLed;
-        statusLed->begin();
-    }
-    if (node::config.display != nullptr) {
-        static TemperatureDisplay temperatureDisplay(
-            *node::config.display
-        );
-        display = &temperatureDisplay;
-        display->begin();
-    }
-}
+// Declared before any function: the Arduino builder inserts auto-generated prototypes
+// above the first function definition.
+enum class UdpResult { Delivered, Rejected, Failed };
 
-/**
- * @brief Obtain the current UTC timestamp using the ESP32 system clock.
- * @return Timestamp formatted as YYYY-MM-DDTHH:MM:SSZ, or an empty string if
- * clock retrieval or formatting fails. Failures are logged to Serial.
- */
 std::string currentTimestamp() {
     struct tm timeinfo{};
     if (!getLocalTime(&timeinfo, 5000)) { // Increased timeout to 5 seconds
@@ -87,45 +44,30 @@ std::string currentTimestamp() {
         Serial.println("strftime failed");
         return {};
     }
-    
+
     return timestamp;
 }
 
-/**
- * @brief Sample the sensor and send an encoded reading to MQTT and UDP.
- */
-void sendReading() {
+// Builds and encodes the next reading. Returns an empty string if no reading is available.
+std::string buildReading() {
 
     if (sessionId.empty()) {
         sessionId = std::string("boot-") + std::to_string(esp_random());
-        return;
-    }
-    if (sensor == nullptr) {
-        return;
+        return {};
     }
 
     float temperature = 0;
     float humidity = 0;
-    if (!sensor->read(temperature, humidity)) {
-        sensorError = true;
-        if (display != nullptr) {
-            display->showUnavailable();
-        }
-        return;
-    }
-    sensorError = false;
-    if (display != nullptr) {
-        display->showReadings(temperature, humidity);
+    if (!dhtRead(temperature, humidity)) {
+        return {};
     }
 
     const std::string timestamp = currentTimestamp();
-  
+
     if (timestamp.empty()) {
-        timeSynchronized = false;
         Serial.println("Could not get synchronized timestamp");
-        return;
+        return {};
     }
-    timeSynchronized = true;
 
     sequenceNumber++;
 
@@ -163,87 +105,186 @@ void sendReading() {
     try {
         std::string datagram = encode(message);
 
-        Serial.println("\nSending reading:");
+        Serial.println("\nNew reading:");
         Serial.println(datagram.c_str());
-
-        // Same JSON to the Command Centre; it accepts the UDP envelope as-is.
-        mqtt.publishReading(datagram);
-
-        transmissionError = !udp.send(datagram);
+        return datagram;
     }
     catch (const ProtocolError& error) {
-        transmissionError = true;
         Serial.print("Protocol error: ");
         Serial.println(error.what());
     }
     catch (const std::exception& error) {
-        transmissionError = true;
         Serial.print("Error: ");
         Serial.println(error.what());
     }
+    return {};
 }
 
-/**
- * @brief Initialize Serial, Wi-Fi, UTC time, the sensor, UDP, and MQTT.
- */
+bool wifiUp() {
+    return WiFi.status() == WL_CONNECTED;
+}
+
+// ---- MQTT (Command Centre) ----------------------------------------------------------------
+
+bool mqttUp() {
+    return wifiUp() && mqttIsConnected();
+}
+
+void deliverMqtt(const std::string& datagram) {
+    // While a backlog exists the new reading joins it, so readings arrive in order.
+    if (mqttUp() && mqttSpool.empty() && mqttPublishReading(datagram)) {
+        return;
+    }
+    Serial.println("[mqtt] link down or backlog pending: buffering reading");
+    mqttSpool.push(datagram);
+}
+
+void replayMqtt() {
+    for (int i = 0; i < replay_batch && !mqttSpool.empty() && mqttUp(); ++i) {
+        std::string datagram;
+        if (!mqttSpool.peek(datagram)) {
+            Serial.println("[mqtt] dropping corrupt buffered reading");
+            mqttSpool.pop();
+            continue;
+        }
+        if (!mqttPublishReading(datagram)) {
+            break;   // outbox full or client gone: retry next loop
+        }
+        mqttSpool.pop();
+        Serial.printf("[mqtt] replayed buffered reading, %u left\n", mqttSpool.size());
+    }
+}
+
+// ---- UDP (alert server) -------------------------------------------------------------------
+
+// Sends one reading. With QoS AtLeastOnce the server ACKs every reading, so delivery is
+// confirmed by the ACK; with BestEffort the server never answers, so only local failures
+// (WiFi down, DNS/socket error) can be detected.
+UdpResult udpDeliver(const std::string& datagram) {
+    if (!wifiUp()) {
+        return UdpResult::Failed;
+    }
+
+    Identity identity;
+    Qos qos;
+    try {
+        const Message message = decode(datagram);
+        const auto* reading = std::get_if<Reading>(&message);
+        if (reading == nullptr) {
+            Serial.println("[udp] buffered datagram is not a reading, dropping");
+            return UdpResult::Rejected;
+        }
+        identity = reading->identity;
+        qos = reading->qos;
+    }
+    catch (const std::exception& error) {
+        Serial.print("[udp] undecodable datagram, dropping: ");
+        Serial.println(error.what());
+        return UdpResult::Rejected;
+    }
+
+    if (!udpSend(datagram)) {
+        return UdpResult::Failed;
+    }
+    if (qos != Qos::AtLeastOnce) {
+        return UdpResult::Delivered;
+    }
+
+    const unsigned long start = millis();
+    while (millis() - start < node::config.response_timeout_ms) {
+        switch (udpReceiveResponse(identity.session_id, identity.seq)) {
+            case UdpResponse::Ack:
+                return UdpResult::Delivered;
+            case UdpResponse::Reject:
+                return UdpResult::Rejected;   // resending would be rejected again
+            default:
+                break;
+        }
+        delay(10);
+    }
+    Serial.println("[udp] no ACK from alert server");
+    return UdpResult::Failed;
+}
+
+void deliverUdp(const std::string& datagram) {
+    if (udpSpool.empty() && udpDeliver(datagram) != UdpResult::Failed) {
+        return;
+    }
+    Serial.println("[udp] link down or backlog pending: buffering reading");
+    udpSpool.push(datagram);
+}
+
+void replayUdp() {
+    for (int i = 0; i < replay_batch && !udpSpool.empty() && wifiUp(); ++i) {
+        std::string datagram;
+        if (!udpSpool.peek(datagram)) {
+            Serial.println("[udp] dropping corrupt buffered reading");
+            udpSpool.pop();
+            continue;
+        }
+        if (udpDeliver(datagram) == UdpResult::Failed) {
+            break;   // still down: keep it and retry next loop
+        }
+        udpSpool.pop();
+        Serial.printf("[udp] replayed buffered reading, %u left\n", udpSpool.size());
+    }
+}
+
 void setup() {
 
     Serial.begin(node::config.serial_baud);
-    initializeHardware();
+
+    // Mount SPIFFS first: readings buffered before a restart are replayed once the links
+    // are back. Failure is not fatal; the node then runs without a rolling window.
+    if (spoolMount()) {
+        mqttSpool.begin();
+        udpSpool.begin();
+    }
 
     Serial.println("Connecting to WiFi...");
 
+    WiFi.setAutoReconnect(true);
     WiFi.begin(node::config.wifi_ssid, node::config.wifi_password);
 
     while (WiFi.status() != WL_CONNECTED) {
-        updateStatusLed();
         delay(500);
         Serial.print(".");
     }
 
     Serial.println("\nWiFi connected!");
-    updateStatusLed();
 
     configTime(0, 0, "pool.ntp.org", "time.nist.gov");
     struct tm timeinfo{};
     timeSynchronized = getLocalTime(&timeinfo, node::config.time_sync_threshold_ms);
     Serial.println(timeSynchronized ? "Time synchronized!" : "Time synchronization failed");
 
+    dhtBegin();
+
     Serial.print("ESP32 IP: ");
     Serial.println(WiFi.localIP());
 
-    transmissionError = !udp.begin();
+    udpBegin();
 
-    mqtt.begin();
+    mqttStart();
 }
 
-/**
- * @brief Send a reading, poll for UDP responses, and wait before the next cycle.
- */
 void loop() {
 
-    sendReading();
+    const std::string datagram = buildReading();
 
-    // Wait briefly for a response
-    unsigned long start = millis();
-
-    while (millis() - start < node::config.response_timeout_ms) {
-
-        udp.receiveResponse(sessionId, sequenceNumber);
-        updateStatusLed();
-        if (display != nullptr) {
-            display->update();
-        }
-
-        delay(10);
+    if (!datagram.empty()) {
+        // Same JSON to the Command Centre; it accepts the UDP envelope as-is.
+        deliverMqtt(datagram);
+        deliverUdp(datagram);
     }
 
-    start = millis();
-    while (millis() - start < node::config.reading_delay_ms) {
-        if (display != nullptr) {
-            display->update();
-        }
-        delay(10);
+    // Send what was buffered during an outage (or before a restart) once a link is back.
+    replayMqtt();
+    replayUdp();
+
+    if (!mqttSpool.empty() || !udpSpool.empty()) {
+        Serial.printf("[spool] pending: mqtt=%u udp=%u\n", mqttSpool.size(), udpSpool.size());
     }
-    updateStatusLed();
+
+    delay(node::config.reading_delay_ms);
 }

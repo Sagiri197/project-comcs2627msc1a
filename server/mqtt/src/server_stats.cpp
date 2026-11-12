@@ -4,9 +4,7 @@
 
 #include <ctime>
 
-namespace {
-
-std::string iso_utc(ServerStats::Clock::time_point at) {
+std::string iso_utc(std::chrono::system_clock::time_point at) {
     const std::time_t seconds = ServerStats::Clock::to_time_t(at);
     std::tm utc{};
 #if defined(_WIN32)
@@ -18,6 +16,8 @@ std::string iso_utc(ServerStats::Clock::time_point at) {
     std::strftime(text, sizeof text, "%Y-%m-%dT%H:%M:%SZ", &utc);
     return text;
 }
+
+namespace {
 
 long long seconds_between(ServerStats::Clock::time_point from, ServerStats::Clock::time_point to) {
     return std::chrono::duration_cast<std::chrono::seconds>(to - from).count();

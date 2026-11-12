@@ -15,7 +15,6 @@ AlertServer::AlertServer(ReadingStore& store, AlertLogic& logic, std::unique_ptr
 AlertServer::ReceivedMessage AlertServer::receive() {
 
     auto datagram = m_socket->recv();
-    std::optional<AlertLogic::ComparisonResult> comparison;
     
     try {
         auto message = common::protocol::decode(datagram.data);
@@ -23,16 +22,18 @@ AlertServer::ReceivedMessage AlertServer::receive() {
         if (const auto* reading = std::get_if<common::protocol::Reading>(&message)) {
             
             try {
-
-                comparison = m_logic.processReading(*reading);
+                // Process with AlertLogic (compares with last reading from DB, logs alerts)
+                m_logic.processReading(*reading);
                 
                 // Save the reading to database
-                m_store.save(*reading);
+                const auto result = m_store.save(*reading);
 
-            } catch (const PersistenceError&) {
-                throw;
+                if (reading->qos == common::protocol::Qos::AtLeastOnce) {
+                    send(common::protocol::Ack{reading->identity}, datagram.sender);
+                }
             } catch (const std::exception& e) {
                 
+                // Send reject on processing/storage error
                 spdlog::warn("Error processing reading: {}", e.what());
                 try {
                     send(common::protocol::Reject{
@@ -43,16 +44,11 @@ AlertServer::ReceivedMessage AlertServer::receive() {
                 } catch (const std::exception& send_error) {
                     spdlog::error("Failed to send reject: {}", send_error.what());
                 }
-                return {std::move(message), std::move(datagram.sender)};
-            }
-
-            if (reading->qos == common::protocol::Qos::AtLeastOnce) {
-                send(common::protocol::Ack{reading->identity}, datagram.sender);
             }
         }
 
-        return {std::move(message), std::move(datagram.sender), std::move(comparison)};
-    } catch (const common::protocol::ProtocolError& e) {
+        return {std::move(message), std::move(datagram.sender)};
+    } catch (const std::exception& e) {
         spdlog::warn("Decode error: {}", e.what());
         throw;
     }
