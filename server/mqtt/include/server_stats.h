@@ -6,26 +6,31 @@
 #include <mutex>
 #include <string>
 
-// UTC timestamp as used on MQTT, e.g. "2026-11-08T21:40:05Z".
-std::string iso_utc(std::chrono::system_clock::time_point at);
-
-// Counters the receive loop updates and the MQTT heartbeat reports. Safe to update from the
-// receive loop while the publisher thread reads them.
 class ServerStats {
 public:
     using Clock = std::chrono::system_clock;
 
+    /** @brief Creates a statistics collector with the given server start time. */
     explicit ServerStats(Clock::time_point started = Clock::now()) : m_started(started) {}
 
+    /** @brief Records a received reading and updates the most-recent reading details. */
     void reading_received(const std::string& node_id, Clock::time_point at = Clock::now());
+
+    /** @brief Increments the invalid-datagram counter. */
     void invalid_datagram() noexcept { ++m_invalid_datagrams; }
+
+    /** @brief Increments the storage-error counter. */
     void storage_error() noexcept { ++m_storage_errors; }
 
-    // The heartbeat payload published on comcs/cell1/alert-server/heartbeat, e.g.
-    // {"status":"online","dateIssued":"2026-11-08T21:40:05Z","uptimeSeconds":125,"udpPort":8080,
-    //  "readingsReceived":42,"invalidDatagrams":0,"storageErrors":0,
-    //  "lastReading":{"nodeId":"esp32-001","secondsAgo":2}}
-    // "lastReading" is null until the first reading arrives.
+    /**
+     * @brief Serializes the server heartbeat as JSON.
+     *
+     * The payload includes status, UTC issue time, uptime, UDP port, counters, and the most
+     * recent reading. `lastReading` is null until a reading has been recorded.
+     * @param udp_port UDP port served by the daemon.
+     * @param now Time used for the issue timestamp, uptime, and reading age.
+     * @return Compact JSON suitable for publishing on the heartbeat topic.
+     */
     std::string heartbeat_json(std::uint16_t udp_port, Clock::time_point now = Clock::now()) const;
 
 private:
