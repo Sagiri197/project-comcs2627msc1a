@@ -1,8 +1,5 @@
 #include "alert_server.h"
-#include "alert_publisher.h"
 #include "application.h"
-#include "server_stats.h"
-#include "status_publisher.h"
 #include "server_config.h"
 
 #include "logging.h"
@@ -63,30 +60,26 @@ int main(int argc, char** argv) {
 
         ReadingStore store(config.database_path);
         AlertLogic logic(store);
-        AlertServer server(store, logic, {config.udp.bind_address, config.udp.port});
-        spdlog::info("UDP server listening on port {}", config.udp.port);
-
-        std::unique_ptr<MqttPublisher> mqtt;
-        std::unique_ptr<StatusPublisher> status;
-        std::unique_ptr<AlertPublisher> alerts;
+        
+        // Create AlertServer with optional MQTT support
+        std::optional<ServerConfig::MqttSettings> mqtt_config;
         if (config.mqtt_enabled) {
-            mqtt = std::make_unique<MqttPublisher>(config.mqtt);
-            status = std::make_unique<StatusPublisher>(*mqtt, config.mqtt, config.udp.port);
-            alerts = std::make_unique<AlertPublisher>(*mqtt, config.mqtt);
+            mqtt_config = config.mqtt;
+            spdlog::info("MQTT enabled: connecting to {}:{}", config.mqtt.host, config.mqtt.port);
         } else {
             spdlog::info("MQTT disabled by configuration");
         }
+        
+        AlertServer server(store, logic, {config.udp.bind_address, config.udp.port}, mqtt_config);
+        spdlog::info("UDP server listening on port {}", config.udp.port);
 
         std::signal(SIGINT, request_stop);
         std::signal(SIGTERM, request_stop);
-        std::thread([&mqtt, &status, &alerts] {
+        std::thread([&mqtt_config] {
             while (!stop_requested) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
             }
             spdlog::info("Stopping");
-            alerts.reset();
-            status.reset();
-            mqtt.reset();   // publishes "offline" and disconnects
             spdlog::shutdown();
             std::_Exit(0);
         }).detach();
@@ -102,16 +95,9 @@ int main(int argc, char** argv) {
                                  message.identity.seq);
                 }, received.message);
 
-                if (const auto* reading = std::get_if<common::protocol::Reading>(&received.message)) {
-                    if (status) status->reading_received(reading->identity.node_id);
-                    if (alerts && received.comparison) alerts->publish(*reading, *received.comparison);
-                }
-
             } catch (const common::protocol::ProtocolError& error) {
-                if (status) status->invalid_datagram();
                 spdlog::warn("Ignoring invalid protocol datagram: {}", error.what());
             } catch (const PersistenceError& error) {
-                if (status) status->storage_error();
                 spdlog::error("Reading was not acknowledged: {}", error.what());
             }
         }
