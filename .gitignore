@@ -10,7 +10,12 @@ server/logs/
 *.sqlite3-shm
 *.sqlite3-shmbuild
 server/Testing/
-logs/
+*.filters
+*.vcxproj
+*.cmake
+*.slnx
+**/CMakeFiles/*
+server/DartConfiguration.tcl
 
 # Nodes
 build/

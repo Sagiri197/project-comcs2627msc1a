@@ -131,10 +131,15 @@ does not use it yet; the `status` topic alone drives the component table.
   than 5 s ahead, the reception time is used instead.
 - **Average:** recomputed every second from nodes whose last live reading is newer than 5 s.
 - **Dashboard:** average gauges, temperature and humidity history (per node plus average, last
-  hour), alert indicator with an Acknowledge button, a recent-alerts table and popups.
+  hour), popups, and an alerts panel below the averages: a collapsible, endlessly scrolling list
+  (newest first, up to 1000 kept in memory) with severity colour-coded (low green, medium yellow,
+  high red), each alert acknowledgeable on its own or all at once.
 - **Failure detection:** retained LWT status plus a 5 s data watchdog per component
   (states OK / STALE / OFFLINE / NO DATA), a popup on state changes, and the MQTT broker
-  connection state.
+  connection state. The **System health** group draws this as a live topology diagram:
+  ESP32 nodes on the left, Command Centre / MQTT broker / Alert Server on the right, solid
+  MQTT links and dashed (animated) UDP links, each coloured green / amber / red by the worse
+  of its two endpoints. Set `CC_HOST` to change the address shown on the Command Centre box.
 
 The expected components default to `esp32-001,esp32-002,alert-server`. Override them with
 the `EXPECTED_COMPONENTS` environment variable.
