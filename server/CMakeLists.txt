@@ -64,8 +64,13 @@ if(BUILD_TESTING)
     gtest_discover_tests(protocol_tests PROPERTIES TIMEOUT 5)
 endif()
 
+add_subdirectory(tools)
 add_subdirectory(udp)
 add_subdirectory(persistency)
 add_subdirectory(application)
 add_subdirectory(mqtt)
 add_subdirectory(daemon)
+
+if(BUILD_TESTING)
+    add_subdirectory(e2e)
+endif()

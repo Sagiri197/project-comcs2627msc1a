@@ -1,19 +1,34 @@
 #include "alert_server.h"
+#include "mqtt_publisher.h"
+#include "alert_publisher.h"
+#include "status_publisher.h"
 
 #include <stdexcept>
 #include <utility>
 #include <spdlog/spdlog.h>
 
-AlertServer::AlertServer(ReadingStore& store, AlertLogic& logic, const UdpEndpoint& endpoint)
-    : AlertServer(store, logic, make_udp_socket(endpoint)) {}
+AlertServer::AlertServer(ReadingStore& store, AlertLogic& logic, const UdpEndpoint& endpoint,
+                        const std::optional<ServerConfig::MqttSettings>& mqtt)
+    : AlertServer(store, logic, make_udp_socket(endpoint), mqtt, endpoint.port) {}
 
-AlertServer::AlertServer(ReadingStore& store, AlertLogic& logic, std::unique_ptr<IUdpSocket> socket)
+AlertServer::AlertServer(ReadingStore& store, AlertLogic& logic, std::unique_ptr<IUdpSocket> socket,
+                        const std::optional<ServerConfig::MqttSettings>& mqtt,
+                        std::optional<std::uint16_t> udp_port)
     : m_socket(std::move(socket)), m_store(store), m_logic(logic) {
     if (!m_socket) throw std::invalid_argument("AlertServer needs a socket");
+
+    if (mqtt) {
+        m_mqtt_publisher = std::make_unique<MqttPublisher>(*mqtt);
+        m_alert_publisher = std::make_unique<AlertPublisher>(*m_mqtt_publisher, *mqtt);
+        
+        std::uint16_t port = udp_port.value_or(0);
+        m_status_publisher = std::make_unique<StatusPublisher>(*m_mqtt_publisher, *mqtt, port);
+    }
 }
 
-AlertServer::ReceivedMessage AlertServer::receive() {
+AlertServer::~AlertServer() = default;
 
+AlertServer::ReceivedMessage AlertServer::receive() {
     auto datagram = m_socket->recv();
     std::optional<AlertLogic::ComparisonResult> comparison;
     
@@ -23,16 +38,17 @@ AlertServer::ReceivedMessage AlertServer::receive() {
         if (const auto* reading = std::get_if<common::protocol::Reading>(&message)) {
             
             try {
-
                 comparison = m_logic.processReading(*reading);
                 
-                // Save the reading to database
                 m_store.save(*reading);
+
+                if (comparison && m_alert_publisher) {
+                    m_alert_publisher->publish(*reading, *comparison);
+                }
 
             } catch (const PersistenceError&) {
                 throw;
             } catch (const std::exception& e) {
-                
                 spdlog::warn("Error processing reading: {}", e.what());
                 try {
                     send(common::protocol::Reject{
@@ -62,4 +78,5 @@ void AlertServer::send(const common::protocol::Message& message,
                        const UdpEndpoint& destination) const {
     m_socket->send(common::protocol::encode(message), destination);
 }
+
 

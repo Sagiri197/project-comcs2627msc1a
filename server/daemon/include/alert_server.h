@@ -4,9 +4,15 @@
 #include "reading_store.h"
 #include "application.h"
 #include "udp_socket.h"
+#include "server_config.h"
 
 #include <memory>
 #include <optional>
+#include <cstdint>
+
+class IMqttPublisher;
+class AlertPublisher;
+class StatusPublisher;
 
 class AlertServer {
 public:
@@ -22,17 +28,25 @@ public:
      * @param store Reading store used to persist readings; must outlive this server.
      * @param logic Alert processor used for received readings; must outlive this server.
      * @param endpoint Local IPv4 address and port to bind.
+     * @param mqtt Optional MQTT settings for publishing alerts and heartbeats.
      */
-    explicit AlertServer(ReadingStore& store, AlertLogic& logic, const UdpEndpoint& endpoint = {"0.0.0.0", 8080});
+    explicit AlertServer(ReadingStore& store, AlertLogic& logic, const UdpEndpoint& endpoint = {"0.0.0.0", 8080},
+                        const std::optional<ServerConfig::MqttSettings>& mqtt = std::nullopt);
 
     /**
      * @brief Creates a server using an existing socket
      * @param store Reading store used to persist readings; must outlive this server.
      * @param logic Alert processor used for received readings; must outlive this server.
      * @param socket Socket used for receiving and sending datagrams.
+     * @param mqtt Optional MQTT settings for publishing alerts and heartbeats.
+     * @param udp_port Optional UDP port for heartbeat messages; if not provided, not included in heartbeats.
      * @throws std::invalid_argument if `socket` is null.
      */
-    AlertServer(ReadingStore& store, AlertLogic& logic, std::unique_ptr<IUdpSocket> socket);
+    AlertServer(ReadingStore& store, AlertLogic& logic, std::unique_ptr<IUdpSocket> socket,
+                const std::optional<ServerConfig::MqttSettings>& mqtt = std::nullopt,
+                std::optional<std::uint16_t> udp_port = std::nullopt);
+
+    ~AlertServer();
 
     /**
      * @brief Receives, decodes, and processes one datagram.
@@ -46,9 +60,10 @@ public:
     void send(const common::protocol::Message& message, const UdpEndpoint& destination) const;
 
 private:
-    
     std::unique_ptr<IUdpSocket> m_socket;
     ReadingStore& m_store;
-    
     AlertLogic& m_logic;
+    std::unique_ptr<IMqttPublisher> m_mqtt_publisher;
+    std::unique_ptr<AlertPublisher> m_alert_publisher;
+    std::unique_ptr<StatusPublisher> m_status_publisher;
 };
