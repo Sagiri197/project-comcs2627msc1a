@@ -1,8 +1,10 @@
 #pragma once
 
 #include "common/protocol.h"
+#include "alert_notifier.h"
 #include <chrono>
 #include <optional>
+#include <memory>
 
 class ReadingStore;
 
@@ -23,7 +25,7 @@ public:
     };
 
     /** @brief Creates alert processing logic backed by a reading store. */
-    explicit AlertLogic(ReadingStore& store);
+    explicit AlertLogic(ReadingStore& store, AlertNotifierPtr notifier = nullptr);
 
     /**
      * @brief Logs a reading and evaluates it against the previous stored reading.
@@ -34,6 +36,7 @@ public:
 
 private:
     ReadingStore& m_store;
+    AlertNotifierPtr m_notifier;
     std::chrono::system_clock::time_point m_last_reading_time;
     
     static constexpr double TEMPERATURE_THRESHOLD = 2.0;
