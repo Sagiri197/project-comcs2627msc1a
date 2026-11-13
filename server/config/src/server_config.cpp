@@ -49,5 +49,19 @@ ServerConfig load_server_config(const std::string& path) {
     if (config.mqtt.keepalive_seconds < 1) {
         throw std::invalid_argument("[mqtt] keepalive_seconds must be at least 1");
     }
+
+    config.email.enabled = reader.get_bool("email", "enabled");
+    config.email.webhook_url = reader.get("email", "webhook_url");
+    config.email.recipient_email = reader.get("email", "recipient_email");
+
+    if (config.email.enabled) {
+        if (config.email.webhook_url.empty()) {
+            throw std::invalid_argument("[email] webhook_url must not be empty when email is enabled");
+        }
+        if (config.email.recipient_email.empty()) {
+            throw std::invalid_argument("[email] recipient_email must not be empty when email is enabled");
+        }
+    }
+
     return config;
 }

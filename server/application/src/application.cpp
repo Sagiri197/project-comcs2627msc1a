@@ -2,6 +2,8 @@
 #include "reading_store.h"
 #include <spdlog/spdlog.h>
 #include <cmath>
+#include <sstream>
+#include <iomanip>
 
 namespace {
 // The protocol carries relativeHumidity as an NGSI-LD fraction (0..1);
@@ -9,8 +11,8 @@ namespace {
 double toPercent(double fraction) { return fraction * 100.0; }
 }  // namespace
 
-AlertLogic::AlertLogic(ReadingStore& store)
-    : m_store(store), m_last_reading_time(std::chrono::system_clock::now()) {}
+AlertLogic::AlertLogic(ReadingStore& store, AlertNotifierPtr notifier)
+    : m_store(store), m_notifier(notifier), m_last_reading_time(std::chrono::system_clock::now()) {}
 
 std::optional<AlertLogic::ComparisonResult> AlertLogic::processReading(
     const common::protocol::Reading& reading) {
@@ -91,7 +93,6 @@ inline void AlertLogic::logComparison(const ComparisonResult& result,
     spdlog::info("Humidity difference: {:.2f}%", result.humidity_diff);
 
     if (has_alert) {
-
         spdlog::warn("Alert triggered for node {}", current.identity.node_id);
 
         if (result.out_of_temp_range)
@@ -102,5 +103,42 @@ inline void AlertLogic::logComparison(const ComparisonResult& result,
             spdlog::warn("Temperature exceeds threshold: {}", result.exceeds_temp_threshold);
         if (result.exceeds_humidity_threshold)
             spdlog::warn("Humidity exceeds threshold: {}", result.exceeds_humidity_threshold);
+
+        if (m_notifier) {
+            const auto& payload = current.payload;
+            const double humidity_percent = toPercent(payload.relative_humidity);
+
+            AlertNotifier::AlertData alert_data{
+                current.identity.node_id,
+                payload.temperature,
+                humidity_percent,
+                "Environmental Alert",
+                ""
+            };
+
+            std::ostringstream message;
+            message << std::fixed << std::setprecision(2);
+            message << "Alert from Node " << current.identity.node_id << ": ";
+
+            if (result.out_of_temp_range) {
+                message << "Temperature out of range (" << payload.temperature << "°C). ";
+            }
+            if (result.out_of_humidity_range) {
+                message << "Humidity out of range (" << humidity_percent << "%). ";
+            }
+            if (result.exceeds_temp_threshold) {
+                message << "Temperature change exceeds threshold (" << result.temperature_diff << "°C). ";
+            }
+            if (result.exceeds_humidity_threshold) {
+                message << "Humidity change exceeds threshold (" << result.humidity_diff << "%). ";
+            }
+
+            alert_data.message = message.str();
+            
+            if (!m_notifier->sendAlert(alert_data)) {
+                spdlog::error("Failed to send alert for node {}", current.identity.node_id);
+            }
+        }
     }
 }
+

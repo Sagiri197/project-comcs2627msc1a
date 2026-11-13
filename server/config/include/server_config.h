@@ -19,10 +19,17 @@ struct ServerConfig {
         int keepalive_seconds;
     };
 
+    struct EmailSettings {
+        bool enabled;
+        std::string webhook_url;
+        std::string recipient_email;
+    };
+
     std::string database_path;
     UdpSettings udp;
     bool mqtt_enabled;
     MqttSettings mqtt;
+    EmailSettings email;
 };
 
 ServerConfig load_server_config(const std::string& path);
