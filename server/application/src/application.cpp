@@ -19,11 +19,22 @@ std::optional<AlertLogic::ComparisonResult> AlertLogic::processReading(
     std::optional<ComparisonResult> comparison;
     logReading(reading);
 
-    if (auto last = m_store.getLastReading()) {
-        comparison = compareWithLast(reading, *last);
-        logComparison(*comparison, reading, *last);
+    if (auto last = m_store.getLastReadingNotFrom(reading.identity.node_id, reading.identity.session_id)) {
+        
+        // Sync check
+        auto time_since_last = std::chrono::duration_cast<std::chrono::milliseconds>(
+            now - m_last_reading_time
+        );
+        
+        if (time_since_last > CROSS_CLIENT_MAX_AGE) {
+            spdlog::info("Last reading older than 3 seconds, skipping cross-client comparison");
+            comparison = std::nullopt;
+        } else {
+            comparison = compareWithLast(reading, *last);
+            logComparison(*comparison, reading, *last);
+        }
     } else {
-        spdlog::info("First reading received, no comparison yet");
+        spdlog::info("First reading received or only readings from this client, no cross-client comparison");
     }
 
     m_last_reading_time = now;

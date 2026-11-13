@@ -163,3 +163,42 @@ std::optional<common::protocol::Reading> ReadingStore::getLastReading() const {
     
     return common::protocol::Reading{identity, common::protocol::Qos::BestEffort, payload, true};
 }
+std::optional<common::protocol::Reading> ReadingStore::getLastReadingNotFrom(
+    const std::string& exclude_node_id,
+    const std::string& exclude_session_id) const {
+    auto statement = prepare(m_database,
+        "SELECT node_id, session_id, seq, temperature, relative_humidity, longitude, latitude "
+        "FROM readings "
+        "WHERE NOT (node_id=?1 AND session_id=?2) "
+        "ORDER BY seq DESC LIMIT 1;");
+    
+    if (sqlite3_bind_text(statement.get(), 1, exclude_node_id.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK ||
+        sqlite3_bind_text(statement.get(), 2, exclude_session_id.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK) {
+        database_error(m_database, "Bind exclusion identity");
+    }
+    
+    const int result = sqlite3_step(statement.get());
+    if (result != SQLITE_ROW) {
+        return std::nullopt;  // No other readings exist
+    }
+    
+    const std::string node_id = reinterpret_cast<const char*>(sqlite3_column_text(statement.get(), 0));
+    const std::string session_id = reinterpret_cast<const char*>(sqlite3_column_text(statement.get(), 1));
+    const std::uint32_t seq = sqlite3_column_int(statement.get(), 2);
+    const double temperature = sqlite3_column_double(statement.get(), 3);
+    const double humidity = sqlite3_column_double(statement.get(), 4);
+    const double longitude = sqlite3_column_double(statement.get(), 5);
+    const double latitude = sqlite3_column_double(statement.get(), 6);
+    
+    common::protocol::Identity identity{node_id, session_id, seq};
+    common::protocol::WeatherObserved payload{
+        "urn:ngsi-ld:WeatherObserved:" + node_id + ":" + session_id + ":" + std::to_string(seq),
+        "2026-11-07T00:00:00Z",
+        {longitude, latitude},
+        "urn:ngsi-ld:Device:" + node_id,
+        temperature,
+        humidity
+    };
+    
+    return common::protocol::Reading{identity, common::protocol::Qos::BestEffort, payload, true};
+}

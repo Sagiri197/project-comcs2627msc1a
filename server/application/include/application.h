@@ -44,6 +44,8 @@ private:
     
     static constexpr double HUMIDITY_MIN = 20.0;
     static constexpr double HUMIDITY_MAX = 80.0;
+    
+    static constexpr std::chrono::milliseconds CROSS_CLIENT_MAX_AGE{3000};
 
     ComparisonResult compareWithLast(const common::protocol::Reading& current,
                                      const common::protocol::Reading& last) const;
