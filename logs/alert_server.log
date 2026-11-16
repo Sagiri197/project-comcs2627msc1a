@@ -1,0 +1,3 @@
+1794478651 [info] UDP server listening on port 8080
+1794478651 [warning] MQTT broker 127.0.0.1:1883 unreachable (Connection refused); retrying every 2 s
+1794478654 [info] Stopping

@@ -61,6 +61,37 @@ TEST_F(ReadingStoreTest, ReturnsNoReadingForUnknownIdentity) {
     EXPECT_FALSE(store.find(reading().identity));
 }
 
+TEST_F(ReadingStoreTest, FindsPreviousReadingFromSameEspAndPrefersCurrentSession) {
+    ReadingStore store(path);
+    const auto first = reading();
+    auto other_esp = first;
+    other_esp.identity.node_id = "esp32-b";
+    other_esp.identity.seq = 100;
+    auto next = first;
+    next.identity.seq = 43;
+    auto other_session = first;
+    other_session.identity.session_id = "boot-2";
+    other_session.identity.seq = 200;
+
+    ASSERT_EQ(store.save(first), SaveResult::Inserted);
+    ASSERT_EQ(store.save(other_esp), SaveResult::Inserted);
+    ASSERT_EQ(store.save(other_session), SaveResult::Inserted);
+
+    const auto previous = store.getLastReadingBefore(next.identity);
+    ASSERT_TRUE(previous);
+    EXPECT_EQ(previous->identity.node_id, first.identity.node_id);
+    EXPECT_EQ(previous->identity.session_id, first.identity.session_id);
+    EXPECT_EQ(previous->identity.seq, first.identity.seq);
+
+    const Identity restarted_session{"esp32-a", "boot-3", 1};
+    const auto previous_session_reading = store.getLastReadingBefore(restarted_session);
+    ASSERT_TRUE(previous_session_reading);
+    EXPECT_EQ(previous_session_reading->identity.session_id, other_session.identity.session_id);
+
+    const Identity another_esp{"esp32-c", "boot-1", 1};
+    EXPECT_FALSE(store.getLastReadingBefore(another_esp));
+}
+
 TEST_F(ReadingStoreTest, IdenticalRetriesDoNotInsertAnotherReading) {
     ReadingStore store(path);
     EXPECT_EQ(store.save(reading()), SaveResult::Inserted);
