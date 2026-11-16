@@ -163,23 +163,24 @@ std::optional<common::protocol::Reading> ReadingStore::getLastReading() const {
     
     return common::protocol::Reading{identity, common::protocol::Qos::BestEffort, payload, true};
 }
-std::optional<common::protocol::Reading> ReadingStore::getLastReadingNotFrom(
-    const std::string& exclude_node_id,
-    const std::string& exclude_session_id) const {
+std::optional<common::protocol::Reading> ReadingStore::getLastReadingBefore(
+    const common::protocol::Identity& before) const {
     auto statement = prepare(m_database,
         "SELECT node_id, session_id, seq, temperature, relative_humidity, longitude, latitude "
         "FROM readings "
-        "WHERE NOT (node_id=?1 AND session_id=?2) "
-        "ORDER BY seq DESC LIMIT 1;");
-    
-    if (sqlite3_bind_text(statement.get(), 1, exclude_node_id.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK ||
-        sqlite3_bind_text(statement.get(), 2, exclude_session_id.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK) {
-        database_error(m_database, "Bind exclusion identity");
+        "WHERE node_id=?1 AND NOT (session_id=?2 AND seq>=?3) "
+        "ORDER BY CASE WHEN session_id=?2 THEN 0 ELSE 1 END, seq DESC LIMIT 1;");
+
+    if (sqlite3_bind_text(statement.get(), 1, before.node_id.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK ||
+        sqlite3_bind_text(statement.get(), 2, before.session_id.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK ||
+        sqlite3_bind_int64(statement.get(), 3, before.seq) != SQLITE_OK) {
+        database_error(m_database, "Bind reading identity");
     }
     
     const int result = sqlite3_step(statement.get());
     if (result != SQLITE_ROW) {
-        return std::nullopt;  // No other readings exist
+        if (result != SQLITE_DONE) database_error(m_database, "Find previous reading");
+        return std::nullopt;
     }
     
     const std::string node_id = reinterpret_cast<const char*>(sqlite3_column_text(statement.get(), 0));

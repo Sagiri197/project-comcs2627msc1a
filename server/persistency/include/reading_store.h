@@ -44,14 +44,11 @@ public:
     std::optional<common::protocol::Reading> getLastReading() const;
 
     /**
-     * @brief Returns the most recently stored reading from a different client (node/session),
-     *        or `std::nullopt` if no other readings exist.
-     * @param exclude_node_id Node ID to exclude from search.
-     * @param exclude_session_id Session ID to exclude from search.
+     * @brief Returns a prior stored reading from the same node, preferring an
+     *        earlier sequence in the current session.
      */
-    std::optional<common::protocol::Reading> getLastReadingNotFrom(
-        const std::string& exclude_node_id,
-        const std::string& exclude_session_id) const;
+    std::optional<common::protocol::Reading> getLastReadingBefore(
+        const common::protocol::Identity& identity) const;
 
 private:
     sqlite3* m_database = nullptr;

@@ -7,7 +7,7 @@ namespace {
 using namespace common::protocol;
 
 Identity identity1() { return {"esp32-1", "boot-1", 1}; }
-Identity identity2() { return {"esp32-2", "boot-1", 2}; }
+Identity identity2() { return {"esp32-1", "boot-1", 2}; }
 
 Reading makeReading(const Identity& id, double temp, double humidity) {
     return {id, Qos::AtLeastOnce,
@@ -47,6 +47,28 @@ TEST_F(AlertLogicTest, ComparesSecondReadingWithFirst) {
     EXPECT_FALSE(result->exceeds_humidity_threshold);
     EXPECT_FALSE(result->out_of_temp_range);
     EXPECT_FALSE(result->out_of_humidity_range);
+}
+
+TEST_F(AlertLogicTest, ComparesReadingsFromSameEspAcrossSessions) {
+    const auto previous = makeReading({"esp32-1", "boot-1", 42}, 23.0, 0.55);
+    const auto current = makeReading({"esp32-1", "boot-2", 1}, 25.0, 0.56);
+
+    store.save(previous);
+    const auto result = logic.processReading(current);
+
+    ASSERT_TRUE(result.has_value());
+    EXPECT_DOUBLE_EQ(result->temperature_diff, 2.0);
+    EXPECT_DOUBLE_EQ(result->humidity_diff, 1.0);
+}
+
+TEST_F(AlertLogicTest, DoesNotCompareAgainstAnotherEsp) {
+    const auto other_esp = makeReading({"esp32-2", "boot-1", 1}, 23.0, 0.55);
+    const auto current = makeReading(identity2(), 25.0, 0.56);
+
+    store.save(other_esp);
+    const auto result = logic.processReading(current);
+
+    EXPECT_FALSE(result.has_value());
 }
 
 TEST_F(AlertLogicTest, DetectsTemperatureThresholdExceeded) {
