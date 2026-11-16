@@ -199,16 +199,18 @@ TEST_F(AlertServerTest, PropagatesInvalidDestinationErrors) {
 }
 
 TEST_F(AlertServerTest, ReturnsComparisonForAlertPublication) {
+    // First reading from this ESP
     peer->send(encode(reading()), server_endpoint);
     const auto first = server.receive();
     EXPECT_FALSE(first.comparison);
     peer->receive();
 
-    auto next_reading = reading();
-    next_reading.identity.seq = 43;
-    next_reading.payload.id = "urn:ngsi-ld:WeatherObserved:esp32-a:boot-1:43";
-    next_reading.payload.temperature += 3.0;
-    peer->send(encode(next_reading), server_endpoint);
+    // The next sequence from the same ESP should be compared.
+    auto other_reading = reading();
+    other_reading.identity.seq = 43;
+    other_reading.payload.id = "urn:ngsi-ld:WeatherObserved:esp32-a:boot-1:43";
+    other_reading.payload.temperature += 3.0;  // +3°C diff to trigger threshold
+    peer->send(encode(other_reading), server_endpoint);
     const auto second = server.receive();
 
     ASSERT_TRUE(second.comparison);

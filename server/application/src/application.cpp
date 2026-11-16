@@ -21,11 +21,11 @@ std::optional<AlertLogic::ComparisonResult> AlertLogic::processReading(
     std::optional<ComparisonResult> comparison;
     logReading(reading);
 
-    if (auto last = m_store.getLastReading()) {
+    if (auto last = m_store.getLastReadingBefore(reading.identity)) {
         comparison = compareWithLast(reading, *last);
         logComparison(*comparison, reading, *last);
     } else {
-        spdlog::info("First reading received, no comparison yet");
+        spdlog::info("No prior reading from this ESP, no comparison");
     }
 
     m_last_reading_time = now;
