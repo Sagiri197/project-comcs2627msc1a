@@ -2,10 +2,13 @@ SHELL := /bin/sh
 # Run from this folder (cd nodes) or from the repo root with: make -C nodes <target>
 
 ARDUINO_CLI ?= arduino-cli
-FQBN ?= esp32:esp32:esp32s3
-FQBN_1 ?= esp32:esp32:esp32
-FQBN_2 ?= esp32:esp32:esp32s3
-FQBN_3 ?= esp32:esp32:esp32s3
+# WiFi + MQTT + BLE do not fit the default 1.25 MB app partition (classic ESP32: ~140%), so
+# the nodes use huge_app (3 MB app, ~900 KB SPIFFS for the spools, no OTA).
+PARTITION ?= huge_app
+FQBN ?= esp32:esp32:esp32s3:PartitionScheme=$(PARTITION)
+FQBN_1 ?= esp32:esp32:esp32:PartitionScheme=$(PARTITION)
+FQBN_2 ?= esp32:esp32:esp32s3:PartitionScheme=$(PARTITION)
+FQBN_3 ?= esp32:esp32:esp32s3:PartitionScheme=$(PARTITION)
 SKETCH ?= sketch
 BUILD_ROOT ?= build
 

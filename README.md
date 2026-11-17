@@ -24,6 +24,7 @@ git submodule update --init --recursive
 - [SQLite](https://github.com/azadkuh/sqlite-amalgamation)
 - [GoogleTest](https://github.com/google/googletest) (testes)
 - [nlohmann/json](https://github.com/nlohmann/json)
+- [SimpleBLE](https://github.com/simpleble/simpleble) (fallback BLE; CMake >= 3.21; Linux: `sudo apt install libdbus-1-dev` e `bluetoothd` a correr; Windows: MSVC). Sem estas dependências: `cmake -DWITH_BLE=OFF`
 - [Doxygen](https://www.doxygen.nl/) (opcional)
 
 ### Firmware ESP32
@@ -57,6 +58,21 @@ git submodule update --init --recursive
    ```sh
    make -C nodes flash
    ```
+
+### Redundância BLE
+
+Quando um nó perde o Wi-Fi, além de guardar as leituras nos spools, anuncia a última leitura
+por BLE (advertising não conectável, sem emparelhamento). O servidor escuta UDP e, se activado,
+faz scan BLE e aplica a mesma lógica de alertas. Activar em `server/alert_server.ini`:
+
+```ini
+[ble]
+enabled = true
+adapter =        # vazio = primeiro adaptador (ex.: hci0)
+```
+
+Formato e semântica: `docs/04 - protocol.md` (secção *BLE fallback*). Os nós usam a partição
+`huge_app` (ver `nodes/Makefile`): Wi-Fi + MQTT + BLE não cabem na partição por omissão.
 
 ## Build e testagem
 
