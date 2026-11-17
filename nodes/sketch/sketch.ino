@@ -8,6 +8,8 @@
 #include "node_mqtt.h"
 #include "node_spool.h"
 #include "node_udp.h"
+#include "src/common/ble_reading.h"
+#include "src/communication/node_ble.h"
 
 #include <string>
 #include <ctime>
@@ -23,6 +25,9 @@ bool timeSynchronized = false;
 // it when only the other link was down). Kept in SPIFFS: survives a restart.
 Spool mqttSpool("/spool_mqtt.bin", node::spool_capacity);
 Spool udpSpool("/spool_udp.bin", node::spool_capacity);
+
+// BLE fallback: while WiFi is down the latest reading is also advertised over BLE.
+BleBeacon bleBeacon;
 
 // Readings replayed per loop iteration and link, so a long backlog does not stall the
 // sensor loop or flood the MQTT outbox.
@@ -230,6 +235,33 @@ void replayUdp() {
     }
 }
 
+// ---- BLE fallback (alert server) ---------------------------------------------------------
+
+// Advertises the reading while WiFi is down. One-way and best effort: the reading also stays
+// in the spools and is replayed over UDP/MQTT later; the server ignores the duplicate.
+void deliverBle(const std::string& datagram) {
+    if (!node::config.ble_fallback || wifiUp()) {
+        return;
+    }
+    try {
+        const Message message = decode(datagram);
+        const auto* reading = std::get_if<Reading>(&message);
+        if (reading == nullptr) {
+            return;
+        }
+        const auto payload = common::ble::encodeReading(*reading);
+        if (!payload) {
+            Serial.println("[ble] reading does not fit in an advertisement");
+            return;
+        }
+        bleBeacon.advertise(*payload);
+    }
+    catch (const std::exception& error) {
+        Serial.print("[ble] could not advertise reading: ");
+        Serial.println(error.what());
+    }
+}
+
 void setup() {
 
     Serial.begin(node::config.serial_baud);
@@ -246,12 +278,20 @@ void setup() {
     WiFi.setAutoReconnect(true);
     WiFi.begin(node::config.wifi_ssid, node::config.wifi_password);
 
-    while (WiFi.status() != WL_CONNECTED) {
+    // Bounded wait: without WiFi the node still runs (spools + BLE fallback) and WiFi keeps
+    // reconnecting in the background.
+    const unsigned long wifiStart = millis();
+    while (WiFi.status() != WL_CONNECTED &&
+           millis() - wifiStart < node::config.wifi_connect_timeout_ms) {
         delay(500);
         Serial.print(".");
     }
 
-    Serial.println("\nWiFi connected!");
+    Serial.println(wifiUp() ? "\nWiFi connected!" : "\nWiFi not available, continuing without it");
+
+    if (node::config.ble_fallback) {
+        bleBeacon.begin();
+    }
 
     configTime(0, 0, "pool.ntp.org", "time.nist.gov");
     struct tm timeinfo{};
@@ -272,10 +312,24 @@ void loop() {
 
     const std::string datagram = buildReading();
 
+    // Booted without WiFi: SNTP syncs in the background once WiFi is up.
+    if (!timeSynchronized) {
+        struct tm timeinfo{};
+        if (getLocalTime(&timeinfo, 0)) {
+            timeSynchronized = true;
+            Serial.println("Time synchronized!");
+        }
+    }
+
+    if (wifiUp()) {
+        bleBeacon.stop();
+    }
+
     if (!datagram.empty()) {
         // Same JSON to the Command Centre; it accepts the UDP envelope as-is.
         deliverMqtt(datagram);
         deliverUdp(datagram);
+        deliverBle(datagram);
     }
 
     // Send what was buffered during an outage (or before a restart) once a link is back.

@@ -6,11 +6,11 @@
 # address and leave. Ctrl+C (or SIGTERM) removes the access point, and the Wi-Fi interface
 # goes back to its normal connection.
 #
-# Every new device must be accepted: until then all its traffic is blocked, and after
+# Every connection must be accepted: until then the device's traffic is blocked, and after
 # ACCEPT_TIMEOUT seconds (ap.env) without an answer it is declined. Commands, typed while
 # it runs (n = the device number shown in the log, or its MAC):
 #   a [n]   accept (no n: the oldest waiting device)
-#   d [n]   decline: kick it; it is refused until this program restarts
+#   d [n]   decline: kick it; if it tries again it is asked about again
 #   k n     disconnect a device; if it comes back it is asked about again
 #   l       list the devices          h   help
 #
@@ -265,7 +265,9 @@ name_of() {
 
 # ---- admission: accept / decline / disconnect ----------------------------------------------
 # Per associated device: STATE pending (blocked, waiting for an answer) or accepted.
-declare -A STATE=() PENDING_SINCE=() ID=() DECLINED=() KICKED=() REFUSED_LOGGED=()
+# Every connection is a new request: a device that leaves, is declined or is disconnected is
+# asked about again when it reconnects.
+declare -A STATE=() PENDING_SINCE=() ID=() KICKED=()
 NEXT_ID=1           # devices get a short number, kept for the whole run, for the commands
 
 # "[3] aa:bb:cc:00:00:03 (esp32-003)"
@@ -297,14 +299,13 @@ accept_device() {
     fi
     nft_approve "$mac" || return 0
     STATE[$mac]=accepted
-    unset 'PENDING_SINCE[$mac]'
+    unset 'PENDING_SINCE[$mac]' 'KICKED[$mac]'
     verb_event "$G" "+ accepted" "$(label "$mac")"
 }
 
-# decline_device MAC REASON: kick it and refuse it for the rest of this run.
+# decline_device MAC REASON: kick it. If it tries again it is a new request.
 decline_device() {
     local mac=$1
-    DECLINED[$mac]=1
     KICKED[$mac]=$2
     STATE[$mac]=declined
     unset 'PENDING_SINCE[$mac]'
@@ -323,20 +324,10 @@ disconnect_device() {
     kick_station "$mac" || true
 }
 
-# A new station: refused if declined earlier in this run, otherwise held until answered.
+# A new station (every connection, also a retry after a decline): held until answered.
 new_station() {
     local mac=$1 sig=$2 now=$3
     [[ -n "${ID[$mac]:-}" ]] || { ID[$mac]=$NEXT_ID; NEXT_ID=$(( NEXT_ID + 1 )); }
-
-    if [[ -n "${DECLINED[$mac]:-}" ]]; then
-        # Devices retry every few seconds: log the refusal at most once a minute.
-        if (( now - ${REFUSED_LOGGED[$mac]:-0} >= 60 )); then
-            REFUSED_LOGGED[$mac]=$now
-            verb_event "$R" "x refused" "$(label "$mac")  ${D}(declined earlier; restart the program to allow it again)${N}"
-        fi
-        kick_station "$mac" || true
-        return 1
-    fi
 
     CONNECTED[$mac]=$now
     STATE[$mac]=pending
@@ -487,7 +478,7 @@ print_help() {
     event "${B}commands${N}  (n = device number from the log, or its MAC)"
     printf '            %-8s %s\n' \
         "a [n]" "accept (no n: the device waiting longest)" \
-        "d [n]" "decline: disconnect it and refuse it until this program restarts" \
+        "d [n]" "decline: disconnect it; if it tries again it is asked about again" \
         "k n"   "disconnect a device; if it comes back it is asked about again" \
         "l"     "list the connected devices" \
         "h"     "this help"
@@ -501,10 +492,6 @@ handle_command() {
     case "${cmd,,}" in
         a|accept)
             resolve_device "$arg" || return 0
-            if [[ "${STATE[$RESOLVED]}" == declined ]]; then
-                cmd_error "$(label "$RESOLVED") was declined; restart the program to allow it again"
-                return 0
-            fi
             accept_device "$RESOLVED" ;;
         d|decline)
             resolve_device "$arg" || return 0

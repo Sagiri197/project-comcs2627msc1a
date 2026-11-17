@@ -117,15 +117,16 @@ While it runs:
   | Command | Effect |
   |---------|--------|
   | `a [n]` | accept device `n` (no `n`: the one waiting longest) |
-  | `d [n]` | decline: disconnect it; it is refused every time it comes back, until the program restarts |
+  | `d [n]` | decline: disconnect it; if it tries again it is a new request |
   | `k n`   | disconnect an accepted device; if it reconnects it is a new request |
   | `l`     | list the connected devices (number, MAC, name, address, state) |
   | `h`     | help |
 
   `n` can also be the MAC address. A device nobody answers within `ACCEPT_TIMEOUT` seconds
-  ([ap.env](ap.env), 60 by default) is declined. Accepting is per run: after a restart every
-  device, ESP32s included, is asked about again. Disconnecting uses `iw station del`
-  (deauthentication); most devices, the ESP32s included, retry by themselves.
+  ([ap.env](ap.env), 60 by default) is declined. Every connection is asked about, nothing is
+  remembered: a device that is declined, disconnected or drops off and reconnects is a new
+  request (devices, ESP32s included, usually retry within seconds). Disconnecting uses `iw station del`
+  (deauthentication).
 - **Recovery**: if the access point drops, it is brought back up.
 
 Its files (`/etc/NetworkManager/dnsmasq-shared.d/comcs.conf`, `/etc/chrony/conf.d/comcs.conf`,
