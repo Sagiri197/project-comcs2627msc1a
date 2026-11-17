@@ -38,14 +38,8 @@ AlertServer::ReceivedMessage AlertServer::receive() {
         if (const auto* reading = std::get_if<common::protocol::Reading>(&message)) {
             
             try {
-                comparison = m_logic.processReading(*reading);
-                
-                m_store.save(*reading);
-
-                if (comparison && m_alert_publisher) {
-                    m_alert_publisher->publish(*reading, *comparison);
-                }
-
+                std::lock_guard<std::mutex> lock(m_processing_mutex);
+                comparison = processReading(*reading);
             } catch (const PersistenceError&) {
                 throw;
             } catch (const std::exception& e) {
@@ -71,6 +65,38 @@ AlertServer::ReceivedMessage AlertServer::receive() {
     } catch (const common::protocol::ProtocolError& e) {
         spdlog::warn("Decode error: {}", e.what());
         throw;
+    }
+}
+
+std::optional<AlertLogic::ComparisonResult> AlertServer::processReading(
+    const common::protocol::Reading& reading) {
+    auto comparison = m_logic.processReading(reading);
+
+    m_store.save(reading);
+
+    if (comparison && m_alert_publisher) {
+        m_alert_publisher->publish(reading, *comparison);
+    }
+    return comparison;
+}
+
+AlertServer::BleOutcome AlertServer::handleBleReading(common::protocol::Reading reading) {
+    try {
+        std::lock_guard<std::mutex> lock(m_processing_mutex);
+
+        if (m_store.find(reading.identity)) {
+            return {false, std::nullopt};   // repeated advertisement or already seen over UDP
+        }
+
+        if (auto previous = m_store.getLastReadingBefore(reading.identity)) {
+            reading.payload.location = previous->payload.location;
+        }
+
+        spdlog::info("Reading received over BLE from node {}", reading.identity.node_id);
+        return {true, processReading(reading)};
+    } catch (const std::exception& e) {
+        spdlog::error("BLE reading from node {} not processed: {}", reading.identity.node_id, e.what());
+        return {false, std::nullopt};
     }
 }
 

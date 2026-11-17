@@ -28,6 +28,15 @@ if(DOXYGEN_FOUND)
     )
 endif()
 
+# BLE fallback receiver. Needs libdbus-1-dev on Linux, MSVC on Windows; when OFF the server
+# still builds and [ble] enabled = true only logs that BLE support is not compiled in.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR MSVC)
+    set(WITH_BLE_DEFAULT ON)
+else()
+    set(WITH_BLE_DEFAULT OFF)
+endif()
+option(WITH_BLE "Build the BLE scanner (SimpleBLE)" ${WITH_BLE_DEFAULT})
+
 add_subdirectory(vendor)
 
 # The unit tests use POSIX sockets/unistd directly; the server itself builds on Windows.
@@ -51,7 +60,7 @@ add_library(nlohmann_json INTERFACE)
 add_library(nlohmann_json::nlohmann_json ALIAS nlohmann_json)
 target_include_directories(nlohmann_json INTERFACE "${SKETCH_SRC}/common")
 
-add_library(common_protocol "${SKETCH_SRC}/common/protocol.cpp")
+add_library(common_protocol "${SKETCH_SRC}/common/protocol.cpp" "${SKETCH_SRC}/common/ble_reading.cpp")
 add_library(common::protocol ALIAS common_protocol)
 target_include_directories(common_protocol PUBLIC "${SKETCH_SRC}" "${SKETCH_SRC}/common")
 target_compile_features(common_protocol PUBLIC cxx_std_20)
@@ -66,6 +75,7 @@ endif()
 
 add_subdirectory(tools)
 add_subdirectory(udp)
+add_subdirectory(ble)
 add_subdirectory(persistency)
 add_subdirectory(communication)
 add_subdirectory(application)

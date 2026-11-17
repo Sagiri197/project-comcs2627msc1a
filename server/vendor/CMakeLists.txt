@@ -34,3 +34,9 @@ target_include_directories(libmosquitto_static PUBLIC
 )
 
 add_subdirectory(spdlog)
+
+# BLE scanning (SimpleBLE: BlueZ over D-Bus on Linux, WinRT on Windows/MSVC).
+if(WITH_BLE)
+    set(SIMPLEBLE_INSTALL OFF CACHE BOOL "" FORCE)
+    add_subdirectory(SimpleBLE/simpleble EXCLUDE_FROM_ALL)
+endif()

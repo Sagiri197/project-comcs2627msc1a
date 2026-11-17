@@ -25,11 +25,18 @@ struct ServerConfig {
         std::string recipient_email;
     };
 
+    /** @brief BLE fallback: readings advertised by nodes that lost WiFi. */
+    struct BleSettings {
+        bool enabled;
+        std::string adapter;   ///< Adapter identifier or address; empty = first adapter.
+    };
+
     std::string database_path;
     UdpSettings udp;
     bool mqtt_enabled;
     MqttSettings mqtt;
     EmailSettings email;
+    BleSettings ble;
 };
 
 ServerConfig load_server_config(const std::string& path);

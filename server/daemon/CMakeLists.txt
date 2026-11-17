@@ -14,6 +14,8 @@ target_link_libraries(alert_server PRIVATE
     spdlog::spdlog
     alert_server_core
     mqtt_publishers
+    ble_scanner
+    common::protocol
 )
 
 if(BUILD_TESTING)

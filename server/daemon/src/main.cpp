@@ -1,4 +1,6 @@
 #include "alert_server.h"
+#include "ble_scanner.h"
+#include "common/ble_reading.h"
 #include "application.h"
 #include "server_config.h"
 
@@ -12,6 +14,8 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <string_view>
+#include <utility>
 #include <thread>
 
 namespace {
@@ -72,6 +76,26 @@ int main(int argc, char** argv) {
         
         AlertServer server(store, logic, {config.udp.bind_address, config.udp.port}, mqtt_config);
         spdlog::info("UDP server listening on port {}", config.udp.port);
+
+        // BLE fallback: nodes without WiFi advertise readings; same alert logic as UDP.
+        std::unique_ptr<IBleScanner> ble_scanner;
+        if (config.ble.enabled) {
+            try {
+                ble_scanner = make_ble_scanner(config.ble.adapter, common::ble::company_id);
+                ble_scanner->start([&server](std::string_view manufacturer_data) {
+                    if (auto reading = common::ble::decodeReading(manufacturer_data)) {
+                        server.handleBleReading(std::move(*reading));
+                    }
+                });
+                spdlog::info("BLE scanning enabled");
+            } catch (const std::exception& error) {
+                // UDP keeps working without BLE.
+                spdlog::error("BLE scanning unavailable: {}", error.what());
+                ble_scanner.reset();
+            }
+        } else {
+            spdlog::info("BLE scanning disabled by configuration");
+        }
 
         std::signal(SIGINT, request_stop);
         std::signal(SIGTERM, request_stop);

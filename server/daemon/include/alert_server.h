@@ -7,6 +7,7 @@
 #include "server_config.h"
 
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <cstdint>
 
@@ -20,6 +21,12 @@ public:
     struct ReceivedMessage {
         common::protocol::Message message;
         UdpEndpoint sender;
+        std::optional<AlertLogic::ComparisonResult> comparison;
+    };
+
+    /** @brief Outcome of a reading received over BLE. */
+    struct BleOutcome {
+        bool processed;  ///< False for a duplicate (already stored) or a failed reading.
         std::optional<AlertLogic::ComparisonResult> comparison;
     };
 
@@ -59,11 +66,28 @@ public:
     /** @brief Encodes and sends a protocol message to a destination endpoint. */
     void send(const common::protocol::Message& message, const UdpEndpoint& destination) const;
 
+    /**
+     * @brief Processes a reading received over BLE with the same alert logic as UDP.
+     *
+     * BLE is one-way and best effort: nothing is sent back. A node repeats its
+     * advertisement many times and may later replay the reading over UDP, so a reading
+     * whose identity is already stored is ignored. BLE readings carry no location; it is
+     * copied from the node's previous stored reading (or left at 0, 0).
+     * Thread-safe with respect to receive(); never throws.
+     */
+    BleOutcome handleBleReading(common::protocol::Reading reading);
+
 private:
+    /** @brief Runs alert logic, stores, and publishes a reading. Caller holds m_processing_mutex. */
+    std::optional<AlertLogic::ComparisonResult> processReading(const common::protocol::Reading& reading);
+
     std::unique_ptr<IUdpSocket> m_socket;
     ReadingStore& m_store;
     AlertLogic& m_logic;
     std::unique_ptr<IMqttPublisher> m_mqtt_publisher;
     std::unique_ptr<AlertPublisher> m_alert_publisher;
     std::unique_ptr<StatusPublisher> m_status_publisher;
+    // Readings arrive from the UDP loop and from the BLE scanner thread; the store,
+    // alert logic and publishers are not thread-safe.
+    std::mutex m_processing_mutex;
 };

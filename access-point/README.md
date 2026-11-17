@@ -12,7 +12,8 @@ Both work the same way:
 
 1. **Start it**: it creates the access point and prints the network details and the values to
    put in the ESP32 configs.
-2. **Leave it running**: it logs every device that connects, gets an address or leaves.
+2. **Leave it running**: it logs every device that connects, gets an address or leaves. On
+   Linux every new device must also be accepted, and any device can be disconnected.
 3. **Ctrl+C**: it removes the access point and undoes everything it changed.
 
 ```
@@ -33,15 +34,24 @@ COMCS access point is up   (Ctrl+C to stop and remove it)
     server_address   alert server name from dns.txt, UDP 8080
     mqtt_host        broker name from dns.txt, TCP 1883
 
-Devices
-  21:34:56  + connected     aa:bb:cc:00:00:01  signal -48 dBm
-  21:34:57  = address       aa:bb:cc:00:00:01 (esp32-001)  ->  192.168.50.23
-  21:34:58  + connected     4c:5f:70:44:0c:be
-  21:34:58  = address       4c:5f:70:44:0c:be (CC-LAPTOP)  ->  192.168.50.87
-  21:34:59  - disconnected  aa:bb:cc:00:00:01 (esp32-001)  192.168.50.23  after 2s
+Devices   new devices are blocked until accepted (auto-decline after 60s)
+  type: a [n] accept   d [n] decline   k n disconnect   l list   h help   (then Enter)
+  21:34:56  ? request       [1] aa:bb:cc:00:00:01  signal -48 dBm   a 1 accept, d 1 decline (auto-decline in 60s)
+a
+  21:34:58  + accepted      [1] aa:bb:cc:00:00:01
+  21:34:59  = address       aa:bb:cc:00:00:01 (esp32-001)  ->  192.168.50.23
+  21:35:02  ? request       [2] 4c:5f:70:44:0c:be   a 2 accept, d 2 decline (auto-decline in 60s)
+a 2
+  21:35:04  + accepted      [2] 4c:5f:70:44:0c:be
+  21:35:05  = address       4c:5f:70:44:0c:be (CC-LAPTOP)  ->  192.168.50.87
   21:35:10  ~ dns.txt       reloaded: 8 names
   21:35:10      + cc.comcs.lan  ->  192.168.50.87
+k 1
+  21:36:00  - disconnected  [1] aa:bb:cc:00:00:01 (esp32-001)  192.168.50.23  after 1m04s  (by you)
 ```
+
+The device log and the accept / decline / disconnect commands above are the Linux program's;
+the Windows one only logs devices (see [Windows](#windows-stand-in-for-the-pi)).
 
 [ap.env](ap.env) holds the Wi-Fi settings (SSID, password, channel) and the ports shown at
 start-up. Put local overrides, such as passwords, in `ap.env.local` (git-ignored).
@@ -75,7 +85,7 @@ ESP32 C ─┘    (alert server runs here: UDP 8080)
 Requires **Raspberry Pi OS Bookworm** or newer (NetworkManager), plus:
 
 ```bash
-sudo apt-get install iw rfkill dnsmasq-base chrony     # once; the program says if any are missing
+sudo apt-get install iw rfkill dnsmasq-base chrony nftables   # once; the program says if any are missing
 ```
 
 Run it (it asks for sudo):
@@ -99,10 +109,27 @@ While it runs:
 - **NTP**: chrony serves this host's time on udp/123.
 - **Device log**: polls the associated stations (`iw station dump`) and the DHCP leases every
   2 s. Some drivers, like the Pi's, do not report signal strength.
+- **Accepting devices**: the Wi-Fi password lets a device associate, but until you accept it
+  all its traffic is dropped (nftables table `inet comcs`): no DHCP address, DNS, NTP, alert
+  server, MQTT or Internet. Each device gets a number (`[3]`) in the log. Type a command and
+  press Enter:
+
+  | Command | Effect |
+  |---------|--------|
+  | `a [n]` | accept device `n` (no `n`: the one waiting longest) |
+  | `d [n]` | decline: disconnect it; it is refused every time it comes back, until the program restarts |
+  | `k n`   | disconnect an accepted device; if it reconnects it is a new request |
+  | `l`     | list the connected devices (number, MAC, name, address, state) |
+  | `h`     | help |
+
+  `n` can also be the MAC address. A device nobody answers within `ACCEPT_TIMEOUT` seconds
+  ([ap.env](ap.env), 60 by default) is declined. Accepting is per run: after a restart every
+  device, ESP32s included, is asked about again. Disconnecting uses `iw station del`
+  (deauthentication); most devices, the ESP32s included, retry by themselves.
 - **Recovery**: if the access point drops, it is brought back up.
 
 Its files (`/etc/NetworkManager/dnsmasq-shared.d/comcs.conf`, `/etc/chrony/conf.d/comcs.conf`,
-`/run/comcs-dns.hosts`) are removed when it stops. If the program is killed hard
+`/run/comcs-dns.hosts`) and the nftables table `inet comcs` are removed when it stops. If the program is killed hard
 (`kill -9`, power loss), the next start cleans up the leftovers.
 
 > **Over SSH:** starting it on `wlan0` drops an SSH session that came in over `wlan0`. Use
@@ -141,6 +168,8 @@ While it runs:
 - **NTP**: Windows Time serves udp/123.
 - **Firewall**: inbound UDP 8080, TCP 1883, TCP 1880 and UDP 123 are opened.
 - **Device log**: polls the hotspot's client list every 2 s; addresses come from the ARP table.
+  Devices are not asked about and cannot be disconnected: the Mobile hotspot API has no way
+  to refuse or kick a client.
 - **Recovery**: Windows switches an idle hotspot off by itself; the program turns it back on.
 
 On Ctrl+C it stops the hotspot, removes the hosts entries, turns the NTP server off and

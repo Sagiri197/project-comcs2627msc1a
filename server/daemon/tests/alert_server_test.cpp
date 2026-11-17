@@ -318,6 +318,61 @@ TEST_F(AlertServerTest, DatabaseFailureSendsNoAcknowledgementAndAllowsRetry) {
     EXPECT_TRUE(observer.find(reading().identity));
 }
 
+Reading ble_reading(std::uint32_t seq, double temperature) {
+    auto result = reading(Qos::BestEffort);
+    result.identity.seq = seq;
+    result.payload.location = {0.0, 0.0};   // BLE readings carry no location
+    result.payload.temperature = temperature;
+    return result;
+}
+
+TEST_F(AlertServerTest, ProcessesBleReadingsWithTheSameAlertLogic) {
+    const auto first = server.handleBleReading(ble_reading(1, 20.0));
+    EXPECT_TRUE(first.processed);
+    EXPECT_FALSE(first.comparison);   // no prior reading from this node
+    EXPECT_TRUE(store.find(ble_reading(1, 20.0).identity));
+
+    const auto second = server.handleBleReading(ble_reading(2, 25.0));
+    EXPECT_TRUE(second.processed);
+    ASSERT_TRUE(second.comparison);
+    EXPECT_DOUBLE_EQ(second.comparison->temperature_diff, 5.0);
+    EXPECT_TRUE(second.comparison->exceeds_temp_threshold);
+
+    // BLE is one-way: nothing is sent back to anyone.
+    peer->expect_no_reply();
+}
+
+TEST_F(AlertServerTest, IgnoresRepeatedBleAdvertisements) {
+    EXPECT_TRUE(server.handleBleReading(ble_reading(1, 20.0)).processed);
+    const auto repeat = server.handleBleReading(ble_reading(1, 20.0));
+    EXPECT_FALSE(repeat.processed);
+    EXPECT_FALSE(repeat.comparison);
+}
+
+TEST_F(AlertServerTest, IgnoresBleReadingAlreadyReceivedOverUdp) {
+    peer->send(encode(reading()), server_endpoint);
+    server.receive();
+    peer->receive();   // ACK
+
+    auto same = reading(Qos::BestEffort);
+    same.payload.location = {0.0, 0.0};
+    EXPECT_FALSE(server.handleBleReading(same).processed);
+}
+
+TEST_F(AlertServerTest, BleReadingTakesLocationFromPreviousReading) {
+    auto earlier = reading();
+    earlier.identity.seq = 1;
+    peer->send(encode(earlier), server_endpoint);
+    server.receive();
+    peer->receive();   // ACK
+
+    ASSERT_TRUE(server.handleBleReading(ble_reading(2, 23.4)).processed);
+    const auto stored = store.find(ble_reading(2, 23.4).identity);
+    ASSERT_TRUE(stored);
+    EXPECT_DOUBLE_EQ(stored->payload.location.longitude, earlier.payload.location.longitude);
+    EXPECT_DOUBLE_EQ(stored->payload.location.latitude, earlier.payload.location.latitude);
+}
+
 static_assert(!std::is_copy_constructible_v<AlertServer>);
 static_assert(!std::is_copy_assignable_v<AlertServer>);
 
