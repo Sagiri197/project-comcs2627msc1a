@@ -81,7 +81,7 @@ All messages use QoS 1. `<nodeId>` matches `node_id` in `nodes/sketch/src/config
 |--------------------------------|---------------|-------------------------------------------|----------|
 | `comcs/cell1/<nodeId>/weather` | ESP32         | WeatherObserved (see below)               | no       |
 | `comcs/cell1/<nodeId>/status`  | ESP32         | `online` on connect, `offline` as LWT     | yes      |
-| `comcs/cell1/alerts`           | alert server  | Alert (see below)                         | no       |
+| `comcs/cell1/alert-server/alert`           | alert server  | Alert (see below)                         | no       |
 | `comcs/cell1/alert-server/status` | alert server | `online` / `offline` (LWT)              | yes      |
 | `comcs/cell1/alert-server/heartbeat` | alert server | Heartbeat JSON every 5 s (see below, QoS 0) | no |
 | `comcs/cell1/command-centre/status` | Node-RED | `online` / `offline` (birth/LWT)          | yes      |
@@ -153,7 +153,7 @@ broker container, so nothing needs installing on the host):
 
 ```bash
 docker exec comcs-mosquitto mosquitto_sub -t 'comcs/#' -v
-docker exec comcs-mosquitto mosquitto_pub -q 1 -t comcs/cell1/alerts -m '{"description":"test alert","severity":"low"}'
+docker exec comcs-mosquitto mosquitto_pub -q 1 -t comcs/cell1/alert-server/alert -m '{"description":"test alert","severity":"low"}'
 docker exec comcs-mosquitto mosquitto_sub -t '$SYS/broker/clients/#' -v   # broker statistics
 docker compose logs -f mosquitto                                         # clients connecting/disconnecting
 ```
