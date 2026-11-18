@@ -6,6 +6,9 @@
 # address and leave. Ctrl+C (or SIGTERM) removes the access point, and the Wi-Fi interface
 # goes back to its normal connection.
 #
+# With ETH_IFACE set (ap.env), a laptop plugged into that Ethernet port gets an address by
+# DHCP on ETH_ADDRESS/24 and reaches this host (e.g. Node-RED at http://ETH_ADDRESS:1880).
+#
 # Every connection must be accepted: until then the device's traffic is blocked, and after
 # ACCEPT_TIMEOUT seconds (ap.env) without an answer it is declined. Commands, typed while
 # it runs (n = the device number shown in the log, or its MAC):
@@ -39,6 +42,10 @@ LEASES=/var/lib/NetworkManager/dnsmasq-$WIFI_IFACE.leases
 POLL_SECS=2
 NFT_TABLE=comcs                     # nftables table "inet comcs": blocks devices not accepted yet
 ACCEPT_TIMEOUT=${ACCEPT_TIMEOUT:-60}
+ETH_IFACE=${ETH_IFACE:-}
+ETH_ADDRESS=${ETH_ADDRESS:-192.168.60.1}
+ETH_PREFIX=24
+ETH_STATE=off                       # off | up | waiting (no cable yet; NetworkManager starts it on plug-in)
 [[ "$ACCEPT_TIMEOUT" =~ ^[0-9]+$ ]] || die "ACCEPT_TIMEOUT must be a number of seconds (access-point/ap.env)"
 
 if [[ -t 1 ]]; then
@@ -56,6 +63,18 @@ if (( ${#missing[@]} )); then
 fi
 (( ${#AP_PASSWORD} >= 8 )) || die "AP_PASSWORD must have at least 8 characters (access-point/ap.env)"
 ip link show "$WIFI_IFACE" >/dev/null 2>&1 || die "no interface '$WIFI_IFACE' (WIFI_IFACE in access-point/ap.env)"
+if [[ -n "$ETH_IFACE" ]]; then
+    [[ "$ETH_ADDRESS" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || die "ETH_ADDRESS must be an IPv4 address (access-point/ap.env)"
+    if ! ip link show "$ETH_IFACE" >/dev/null 2>&1; then
+        warn "no interface '$ETH_IFACE' (ETH_IFACE in access-point/ap.env): Ethernet is not set up"
+        ETH_IFACE=
+    elif [[ -n "$(ip -4 route show default dev "$ETH_IFACE" 2>/dev/null)" ]]; then
+        # Taking it over would cut this host's (and the clients') Internet.
+        warn "$ETH_IFACE is this host's Internet uplink: it is left alone (no laptop port)"
+        ETH_IFACE=
+    fi
+fi
+ETH_LEASES=/var/lib/NetworkManager/dnsmasq-${ETH_IFACE:-none}.leases
 
 # ---- teardown (runs on Ctrl+C, SIGTERM, errors and normal exit) ---------------------------
 started=0
@@ -66,13 +85,14 @@ cleanup() {
     echo
     log "Stopping: removing the access point"
     nmcli connection delete "$AP_CON" >/dev/null 2>&1 || true
+    nmcli connection delete "$ETH_CON" >/dev/null 2>&1 || true
     nft delete table inet "$NFT_TABLE" 2>/dev/null || true
     rm -f "$DNSMASQ_CONF" "$DNS_HOSTS" "$DNS_HOSTS.tmp"
     if [[ -f "$CHRONY_CONF" ]]; then
         rm -f "$CHRONY_CONF"
         systemctl restart chrony 2>/dev/null || true
     fi
-    log "Access point removed. $WIFI_IFACE is back to its normal Wi-Fi."
+    log "Access point removed. $WIFI_IFACE is back to its normal Wi-Fi${ETH_IFACE:+, $ETH_IFACE to its normal connection}."
 }
 trap cleanup EXIT
 trap 'exit 130' INT
@@ -131,11 +151,14 @@ write_dns_hosts() {
 }
 
 # SIGHUP makes dnsmasq re-read its addn-hosts files and clear its cache (leases are kept).
+# NetworkManager runs one dnsmasq per shared interface (Wi-Fi, and Ethernet if set up).
 reload_dnsmasq() {
-    local pid
-    pid="$(pgrep -f "dnsmasq.*--listen-address=$AP_ADDRESS" | head -n1 || true)"
-    [[ -n "$pid" ]] || pid="$(pgrep -f 'dnsmasq.*dnsmasq-shared\.d' | head -n1 || true)"
-    [[ -n "$pid" ]] && kill -HUP "$pid" 2>/dev/null
+    local pids
+    pids="$(pgrep -f 'dnsmasq.*dnsmasq-shared\.d' || true)"
+    [[ -n "$pids" ]] || pids="$(pgrep -f "dnsmasq.*--listen-address=($AP_ADDRESS|$ETH_ADDRESS)" || true)"
+    [[ -n "$pids" ]] || return 1
+    # shellcheck disable=SC2086
+    kill -HUP $pids 2>/dev/null
 }
 
 start_access_point() {
@@ -151,6 +174,7 @@ start_access_point() {
     # Leftovers from a run that was killed (kill -9, power loss), or from older versions.
     nmcli connection delete "$AP_CON" >/dev/null 2>&1 || true
     nmcli connection delete comcs-client >/dev/null 2>&1 || true
+    nmcli connection delete "$ETH_CON" >/dev/null 2>&1 || true
     nft delete table inet "$NFT_TABLE" 2>/dev/null || true
 
     # Admission control: WPA2 lets anyone with the password associate, so a new device is
@@ -198,9 +222,14 @@ EOF
         # point at it too, so ESP32 code using the usual defaults syncs without Internet.
         # chrony resolves through the uplink, not this dnsmasq, so there is no loop.
         printf 'dhcp-option=option:ntp-server,%s\n' "$AP_ADDRESS"
+        # The Ethernet laptop gets no default gateway (an empty router option; dnsmasq tags
+        # each request with the interface it came in on), so its Internet stays on its own
+        # Wi-Fi instead of going through this host.
+        [[ -z "$ETH_IFACE" ]] || printf 'dhcp-option=tag:%s,option:router\n' "$ETH_IFACE"
     } > "$DNSMASQ_CONF"
 
     nmcli --wait 30 connection up "$AP_CON" >/dev/null
+    start_ethernet
 
     # With Internet chrony relays the public pools; without, "local" keeps it serving this
     # machine's own clock instead of refusing.
@@ -212,6 +241,25 @@ local stratum $NTP_LOCAL_STRATUM
 EOF
     systemctl enable --now chrony >/dev/null 2>&1 || true
     systemctl restart chrony
+}
+
+# Laptop port: ETH_IFACE in shared mode on its own subnet (DHCP + the same DNS names).
+# Kept in memory only (save no) and autoconnecting, so plugging the cable in later, or
+# re-plugging it, brings it up; it never outlives this program, not even across a reboot.
+start_ethernet() {
+    [[ -n "$ETH_IFACE" ]] || return 0
+    log "Setting up $ETH_IFACE for a laptop: $ETH_ADDRESS/$ETH_PREFIX, DHCP, no gateway"
+    rm -f "$ETH_LEASES"
+    nmcli connection add save no type ethernet ifname "$ETH_IFACE" con-name "$ETH_CON" \
+        autoconnect yes connection.autoconnect-priority 100 \
+        ipv4.method shared ipv4.addresses "$ETH_ADDRESS/$ETH_PREFIX" \
+        ipv6.method disabled >/dev/null
+    if [[ "$(cat "/sys/class/net/$ETH_IFACE/carrier" 2>/dev/null)" == 1 ]] &&
+       nmcli --wait 20 connection up "$ETH_CON" >/dev/null 2>&1; then
+        ETH_STATE=up
+    else
+        ETH_STATE=waiting
+    fi
 }
 
 print_banner() {
@@ -228,6 +276,10 @@ print_banner() {
         row "Internet"   "shared from $uplink"
     else
         row "Internet"   "${Y}none${N} (no uplink: clients only reach this network)"
+    fi
+    if [[ "$ETH_STATE" != off ]]; then
+        row "Ethernet"   "$ETH_IFACE  $ETH_ADDRESS/$ETH_PREFIX   DHCP for a laptop (no gateway)$([[ "$ETH_STATE" == waiting ]] && printf '  %s' "${Y}no cable yet: starts when plugged in${N}")"
+        row ""           "Node-RED ${B}http://$ETH_ADDRESS:1880${N}   dashboard /dashboard   MQTT $ETH_ADDRESS:$MQTT_PORT"
     fi
     row "NTP"          "$AP_ADDRESS udp/123"
     [[ -n "$uplink" ]] || row "" "${Y}serving this host's own clock: check it with 'date' (fix: access-point/linux/set-time.sh)${N}"
@@ -246,7 +298,7 @@ print_banner() {
 }
 
 # ---- device log -------------------------------------------------------------------------
-declare -A CONNECTED=() IPS=() HOSTS=()
+declare -A CONNECTED=() IPS=() HOSTS=() ETH_IPS=()
 
 event() { printf '  %s  %b\n' "$(printf '%(%H:%M:%S)T' -1)" "$*"; }
 
@@ -382,6 +434,16 @@ poll_devices() {
             decline_device "$mac" auto-declined
         fi
     done
+
+    # Ethernet laptop: no admission control (it is plugged in by hand), just log its address.
+    if [[ "$ETH_STATE" != off && -r "$ETH_LEASES" ]]; then
+        while read -r _ mac ip host _; do
+            [[ -n "${ip:-}" && "${ETH_IPS[$mac]:-}" != "$ip" ]] || continue
+            ETH_IPS[$mac]=$ip
+            HOSTS[$mac]=$host
+            event "${C}= ethernet${N}      $(name_of "$mac")  ->  ${B}$ip${N}   ${D}Node-RED http://$ETH_ADDRESS:1880${N}"
+        done < "$ETH_LEASES"
+    fi
 
     # DHCP leases: "<expiry> <mac> <ip> <hostname> <client-id>". Only accepted devices get one.
     [[ -r "$LEASES" ]] || return 0

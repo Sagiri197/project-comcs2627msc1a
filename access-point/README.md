@@ -21,7 +21,9 @@ COMCS access point is up   (Ctrl+C to stop and remove it)
 
   Wi-Fi          comcs-cell1  password comcs2627  (WPA2, 2.4 GHz, channel 6, wlan0)
   This host      192.168.50.1/24   DHCP for the clients
-  Internet       shared from eth0
+  Internet       none (no uplink: clients only reach this network)
+  Ethernet       eth0  192.168.60.1/24   DHCP for a laptop (no gateway)
+                 Node-RED http://192.168.60.1:1880   dashboard /dashboard   MQTT 192.168.60.1:1883
   NTP            192.168.50.1 udp/123
   DNS            7 names from access-point/dns.txt (edit it any time: reloaded automatically)
                    as.comcs.lan           192.168.50.1
@@ -107,6 +109,16 @@ While it runs:
   subdomains as their own lines. If this host has an uplink (Ethernet), Internet is NAT-shared
   to the clients.
 - **NTP**: chrony serves this host's time on udp/123.
+- **Ethernet for a laptop** (`ETH_IFACE`, default `eth0`; empty turns it off): the port is put
+  in shared mode on `ETH_ADDRESS/24` (default `192.168.60.1`), so a laptop plugged in gets an
+  address by DHCP, logged as `= ethernet`, with no manual IP setup. It reaches this host:
+  Node-RED at `http://192.168.60.1:1880` when the [Command Centre](../command-centre/README.md)
+  runs on the Pi, MQTT on `192.168.60.1:1883`, and the names in `dns.txt`. It gets no default
+  gateway, so its Internet stays on its own Wi-Fi. There is no accept step (it is a cable you
+  plug in by hand). The cable can be plugged in before or after the start. The profile
+  (`comcs-eth`) lives in memory only and is removed on stop, so `eth0` returns to its normal
+  connection. If `eth0` is this host's Internet uplink (it has the default route), it is left
+  alone.
 - **Device log**: polls the associated stations (`iw station dump`) and the DHCP leases every
   2 s. Some drivers, like the Pi's, do not report signal strength.
 - **Accepting devices**: the Wi-Fi password lets a device associate, but until you accept it
