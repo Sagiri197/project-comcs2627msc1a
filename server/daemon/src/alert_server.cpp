@@ -85,14 +85,20 @@ AlertServer::BleOutcome AlertServer::handleBleReading(common::protocol::Reading 
         std::lock_guard<std::mutex> lock(m_processing_mutex);
 
         if (m_store.find(reading.identity)) {
-            return {false, std::nullopt};   // repeated advertisement or already seen over UDP
+            // Repeated advertisement or already seen over UDP: only visible at debug level.
+            spdlog::debug("BLE reading from node {} session={} seq={} already stored, ignored",
+                          reading.identity.node_id, reading.identity.session_id, reading.identity.seq);
+            return {false, std::nullopt};
         }
 
         if (auto previous = m_store.getLastReadingBefore(reading.identity)) {
             reading.payload.location = previous->payload.location;
         }
 
-        spdlog::info("Reading received over BLE from node {}", reading.identity.node_id);
+        spdlog::info("Reading received over BLE from node {}: session={} seq={} {:.2f} °C {:.1f} % at {}",
+                     reading.identity.node_id, reading.identity.session_id, reading.identity.seq,
+                     reading.payload.temperature, reading.payload.relative_humidity * 100.0,
+                     reading.payload.date_observed);
         return {true, processReading(reading)};
     } catch (const std::exception& e) {
         spdlog::error("BLE reading from node {} not processed: {}", reading.identity.node_id, e.what());

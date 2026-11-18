@@ -13,6 +13,7 @@
 #include <exception>
 #include <iostream>
 #include <memory>
+#include <set>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -82,9 +83,18 @@ int main(int argc, char** argv) {
         if (config.ble.enabled) {
             try {
                 ble_scanner = make_ble_scanner(config.ble.adapter, common::ble::company_id);
-                ble_scanner->start([&server](std::string_view manufacturer_data) {
+                // Runs on the BLE thread. A bad advertisement repeats too, so each distinct
+                // undecodable payload is reported once (the set is bounded).
+                ble_scanner->start([&server, undecodable = std::set<std::string>{}](
+                                       std::string_view manufacturer_data) mutable {
                     if (auto reading = common::ble::decodeReading(manufacturer_data)) {
                         server.handleBleReading(std::move(*reading));
+                        return;
+                    }
+                    if (undecodable.size() >= 256) undecodable.clear();
+                    if (undecodable.emplace(manufacturer_data).second) {
+                        spdlog::warn("Ignoring BLE advertisement that is not a valid reading ({} bytes)",
+                                     manufacturer_data.size());
                     }
                 });
                 spdlog::info("BLE scanning enabled");

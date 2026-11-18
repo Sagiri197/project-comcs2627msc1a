@@ -3,7 +3,10 @@
 #include <simpleble/SimpleBLE.h>
 #include <spdlog/spdlog.h>
 
+#include <mutex>
+#include <set>
 #include <stdexcept>
+#include <string>
 #include <utility>
 
 namespace {
@@ -65,6 +68,21 @@ private:
             const auto entry = data.find(m_company_id);
             if (entry == data.end()) return;
             const std::string payload = entry->second;
+
+            // A node advertises continuously: name each sender once, then log at debug level.
+            const std::string address = peripheral.address();
+            const int rssi = peripheral.rssi();
+            bool first_time = false;
+            {
+                std::lock_guard<std::mutex> lock(m_seen_mutex);
+                first_time = m_seen_addresses.insert(address).second;
+            }
+            if (first_time) {
+                spdlog::info("BLE node advertising: {} (rssi {} dBm, company 0x{:04X}, {} bytes)",
+                             address, rssi, m_company_id, payload.size());
+            }
+            spdlog::debug("BLE advertisement from {} (rssi {} dBm, {} bytes)", address, rssi, payload.size());
+
             m_handler(payload);
         } catch (const std::exception& error) {
             spdlog::warn("Ignoring BLE advertisement: {}", error.what());
@@ -76,6 +94,8 @@ private:
     SimpleBLE::Adapter m_adapter;
     Handler m_handler;
     bool m_scanning = false;
+    std::mutex m_seen_mutex;
+    std::set<std::string> m_seen_addresses;   // advertisers already logged at info level
 };
 
 }  // namespace
