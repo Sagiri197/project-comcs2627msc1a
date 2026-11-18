@@ -117,13 +117,16 @@ Suggested `subCategory` values: `temperatureDifferential`, `humidityDifferential
 `temperatureOutOfRange`, `humidityOutOfRange`.
 
 **Alert server heartbeat:** published every `--status-interval` seconds (default 5) while the
-alert server is connected. `lastReading` is `null` until the first reading arrives. The flow
-does not use it yet; the `status` topic alone drives the component table.
+alert server is connected. `lastReading` is `null` until the first reading arrives. `ble`
+lists every node the alert server has received readings from over BLE (nodes that lost WiFi),
+with the age of its latest BLE reading; it is empty until one arrives. The flow uses the
+heartbeat's arrival as the alert server's watchdog and `ble` to show nodes on BLE.
 
 ```json
 {"status":"online","dateIssued":"2026-11-08T21:57:05Z","uptimeSeconds":125,"udpPort":8080,
  "readingsReceived":42,"invalidDatagrams":0,"storageErrors":0,
- "lastReading":{"nodeId":"esp32-001","secondsAgo":2}}
+ "lastReading":{"nodeId":"esp32-001","secondsAgo":2},
+ "ble":[{"nodeId":"esp32-002","secondsAgo":3}]}
 ```
 
 ## What the flow does
@@ -146,6 +149,11 @@ does not use it yet; the `status` topic alone drives the component table.
   ESP32 nodes on the left, Command Centre / MQTT broker / Alert Server on the right, solid
   MQTT links and dashed (animated) UDP links, each coloured green / amber / red by the worse
   of its two endpoints. Set `CC_HOST` to change the address shown on the Command Centre box.
+- **BLE fallback:** a node whose MQTT data has stopped but which the alert server heard over
+  BLE in the last 15 s (heartbeat `ble`) is shown as **BLE** in blue rather than OFFLINE: its
+  MQTT link turns red and its UDP link is replaced by a blue BLE link with Bluetooth symbols
+  flowing to the Alert Server. When BLE readings stop it becomes OFFLINE; when its MQTT data
+  returns it is OK again. Each change raises a popup.
 
 The expected components default to `esp32-001,esp32-002,alert-server`. Override them with
 the `EXPECTED_COMPONENTS` environment variable.
@@ -154,7 +162,8 @@ the `EXPECTED_COMPONENTS` environment variable.
 
 The **Simulator** tab publishes to the broker: one reading per node, a continuous 1 s
 stream (enable the disabled `every 1 s` inject), an alert, LWT offline/online, a 2-minute-old
-buffered reading and an invalid reading. From the command line (the MQTT clients come with the
+buffered reading, an invalid reading, and `esp32-002 on BLE (15 s)` (LWT offline plus an
+alert-server heartbeat listing it under `ble`; click it again to keep it on BLE). From the command line (the MQTT clients come with the
 broker container, so nothing needs installing on the host):
 
 ```bash

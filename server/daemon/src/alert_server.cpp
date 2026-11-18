@@ -73,6 +73,7 @@ std::optional<AlertLogic::ComparisonResult> AlertServer::processReading(
     auto comparison = m_logic.processReading(reading);
 
     m_store.save(reading);
+    if (m_status_publisher) m_status_publisher->reading_received(reading.identity.node_id);
 
     if (comparison && m_alert_publisher) {
         m_alert_publisher->publish(reading, *comparison);
@@ -99,6 +100,7 @@ AlertServer::BleOutcome AlertServer::handleBleReading(common::protocol::Reading 
                      reading.identity.node_id, reading.identity.session_id, reading.identity.seq,
                      reading.payload.temperature, reading.payload.relative_humidity * 100.0,
                      reading.payload.date_observed);
+        if (m_status_publisher) m_status_publisher->ble_reading_received(reading.identity.node_id);
         return {true, processReading(reading)};
     } catch (const std::exception& e) {
         spdlog::error("BLE reading from node {} not processed: {}", reading.identity.node_id, e.what());
