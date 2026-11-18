@@ -58,10 +58,16 @@ NAT, so they cannot reach a broker running in it.
 
 ### Joining the cell
 
-Connect this machine's Wi-Fi to the Pi's access point (`AP_SSID` in `access-point/ap.env`). The Pi
-gives it an address by DHCP; once it has joined, add `cc.comcs.lan <that address>` (shown in the
-access point's device log) to `access-point/dns.txt`, and the name resolves within 2 s. The
-ESP32s (`mqtt_host` in `nodes/sketch/src/configs/*.h`) and the alert server use that name.
+The ESP32s (`mqtt_host` in `nodes/sketch/src/configs/*.h`) and the alert server reach the
+broker by the name `cc.comcs.lan`. In `access-point/dns.txt` it points at the Pi itself
+(`192.168.50.1`) by default, so running this stack on the Pi needs no DNS change. A laptop on
+the Pi's Ethernet port (`ETH_IFACE` in `access-point/ap.env`) opens Node-RED at
+`http://192.168.60.1:1880`.
+
+To run it on another machine instead, connect that machine's Wi-Fi to the Pi's access point
+(`AP_SSID` in `access-point/ap.env`). Once it has joined, change the `cc.comcs.lan` line in
+`access-point/dns.txt` to its address (shown in the access point's device log); the name
+resolves within 2 s.
 
 | What      | Where                                          |
 |-----------|------------------------------------------------|

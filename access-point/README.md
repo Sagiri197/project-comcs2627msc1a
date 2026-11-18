@@ -25,7 +25,7 @@ COMCS access point is up   (Ctrl+C to stop and remove it)
   Ethernet       eth0  192.168.60.1/24   DHCP for a laptop (no gateway)
                  Node-RED http://192.168.60.1:1880   dashboard /dashboard   MQTT 192.168.60.1:1883
   NTP            192.168.50.1 udp/123
-  DNS            7 names from access-point/dns.txt (edit it any time: reloaded automatically)
+  DNS            8 names from access-point/dns.txt (edit it any time: reloaded automatically)
                    as.comcs.lan           192.168.50.1
                    pool.ntp.org           192.168.50.1
                    ...
@@ -104,8 +104,9 @@ While it runs:
 - **DHCP and DNS**: NetworkManager's shared mode; this host is `192.168.50.1/24`. The names in
   `dns.txt` are copied to `/run/comcs-dns.hosts` (dnsmasq `addn-hosts`). When `dns.txt`
   changes, the file is rewritten and dnsmasq gets `SIGHUP` to re-read it; DHCP leases are
-  kept. The Command Centre gets an ordinary DHCP address: once it joins, add
-  `cc.comcs.lan <its address>` (from the device log) to `dns.txt`. Names match exactly: `pool.ntp.org` does not cover `0.pool.ntp.org`, so add
+  kept. `cc.comcs.lan` points at this host (`192.168.50.1`) by default, for the Command Centre
+  running in Docker on the Pi. If it runs on another machine instead, change that line to the
+  machine's address from the device log. Names match exactly: `pool.ntp.org` does not cover `0.pool.ntp.org`, so add
   subdomains as their own lines. If this host has an uplink (Ethernet), Internet is NAT-shared
   to the clients.
 - **NTP**: chrony serves this host's time on udp/123.
