@@ -38,6 +38,9 @@ NTP_LOCAL_STRATUM=10                # stratum advertised when serving the Pi's o
 DNSMASQ_CONF=/etc/NetworkManager/dnsmasq-shared.d/comcs.conf
 CHRONY_CONF=/etc/chrony/conf.d/comcs.conf
 DNS_HOSTS=/run/comcs-dns.hosts      # names from dns.txt, read by dnsmasq (addn-hosts)
+ETC_HOSTS=/etc/hosts                # this host's own resolver: gets the cell's .lan names
+HOSTS_BEGIN="# BEGIN comcs access-point: .lan names from access-point/dns.txt, removed when it stops"
+HOSTS_END="# END comcs access-point"
 LEASES=/var/lib/NetworkManager/dnsmasq-$WIFI_IFACE.leases
 POLL_SECS=2
 NFT_TABLE=comcs                     # nftables table "inet comcs": blocks devices not accepted yet
@@ -88,6 +91,8 @@ cleanup() {
     nmcli connection delete "$ETH_CON" >/dev/null 2>&1 || true
     nft delete table inet "$NFT_TABLE" 2>/dev/null || true
     rm -f "$DNSMASQ_CONF" "$DNS_HOSTS" "$DNS_HOSTS.tmp"
+    DNS_ENTRIES=()
+    update_etc_hosts || true
     if [[ -f "$CHRONY_CONF" ]]; then
         rm -f "$CHRONY_CONF"
         systemctl restart chrony 2>/dev/null || true
@@ -148,6 +153,31 @@ write_dns_hosts() {
         printf '%s\n' "${DNS_ENTRIES[@]}"
     } > "$DNS_HOSTS.tmp"
     mv -f "$DNS_HOSTS.tmp" "$DNS_HOSTS"
+    update_etc_hosts || "$1" "could not update $ETC_HOSTS: programs on this host may not resolve the .lan names"
+}
+
+# This host's own programs (the alert server, ...) resolve through /etc/hosts and its normal
+# DNS, not through the dnsmasq it runs for the clients. So the cell's own names (those ending
+# in .lan, e.g. cc.comcs.lan) also go into a marked block at the top of /etc/hosts (first match
+# wins). The public names that dns.txt redirects for the clients (pool.ntp.org, ...) are left
+# out: chrony here must keep reaching the real servers. An empty DNS_ENTRIES removes the block.
+# Rewritten in place (cat >), which keeps the file's owner, mode and inode.
+update_etc_hosts() {
+    local entry name tmp=/run/comcs-etc-hosts.tmp
+    {
+        if (( ${#DNS_ENTRIES[@]} )); then
+            echo "$HOSTS_BEGIN"
+            for entry in "${DNS_ENTRIES[@]}"; do
+                name=${entry#* }
+                [[ "${name,,}" == *.lan ]] && echo "$entry"
+            done
+            echo "$HOSTS_END"
+        fi
+        awk -v b="$HOSTS_BEGIN" -v e="$HOSTS_END" '$0 == b { skip = 1; next } $0 == e { skip = 0; next } !skip' "$ETC_HOSTS"
+    } > "$tmp" && cat "$tmp" > "$ETC_HOSTS"
+    local status=$?
+    rm -f "$tmp"
+    return "$status"
 }
 
 # SIGHUP makes dnsmasq re-read its addn-hosts files and clear its cache (leases are kept).

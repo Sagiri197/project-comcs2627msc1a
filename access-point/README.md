@@ -106,7 +106,12 @@ While it runs:
   changes, the file is rewritten and dnsmasq gets `SIGHUP` to re-read it; DHCP leases are
   kept. `cc.comcs.lan` points at this host (`192.168.50.1`) by default, for the Command Centre
   running in Docker on the Pi. If it runs on another machine instead, change that line to the
-  machine's address from the device log. Names match exactly: `pool.ntp.org` does not cover `0.pool.ntp.org`, so add
+  machine's address from the device log. Programs on the Pi itself (the alert server) do not
+  ask that dnsmasq, so the names ending in `.lan` are also written into a marked block at the
+  top of the Pi's `/etc/hosts`, kept in sync with `dns.txt` and removed on stop. The alert
+  server's `host = cc.comcs.lan` then resolves on the Pi too, while the access point runs.
+  The public names (`pool.ntp.org`, ...) stay out of it, so the Pi's own chrony still reaches
+  the real servers. Names match exactly: `pool.ntp.org` does not cover `0.pool.ntp.org`, so add
   subdomains as their own lines. If this host has an uplink (Ethernet), Internet is NAT-shared
   to the clients.
 - **NTP**: chrony serves this host's time on udp/123.
