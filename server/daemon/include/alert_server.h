@@ -5,6 +5,7 @@
 #include "application.h"
 #include "udp_socket.h"
 #include "server_config.h"
+#include "ble_scanner.h"
 
 #include <memory>
 #include <mutex>
@@ -36,9 +37,13 @@ public:
      * @param logic Alert processor used for received readings; must outlive this server.
      * @param endpoint Local IPv4 address and port to bind.
      * @param mqtt Optional MQTT settings for publishing alerts and heartbeats.
+     * @param ble BLE fallback settings; when enabled, the server creates and owns a platform
+     *            scanner. If no adapter is usable, the error is logged and the server keeps
+     *            running on UDP only.
      */
     explicit AlertServer(ReadingStore& store, AlertLogic& logic, const UdpEndpoint& endpoint = {"0.0.0.0", 8080},
-                        const std::optional<ServerConfig::MqttSettings>& mqtt = std::nullopt);
+                        const std::optional<ServerConfig::MqttSettings>& mqtt = std::nullopt,
+                        const ServerConfig::BleSettings& ble = {false, {}});
 
     /**
      * @brief Creates a server using an existing socket
@@ -47,12 +52,15 @@ public:
      * @param socket Socket used for receiving and sending datagrams.
      * @param mqtt Optional MQTT settings for publishing alerts and heartbeats.
      * @param udp_port Optional UDP port for heartbeat messages; if not provided, not included in heartbeats.
+     * @param ble_scanner Optional BLE scanner; the server starts and owns it. Null disables BLE.
      * @throws std::invalid_argument if `socket` is null.
      */
     AlertServer(ReadingStore& store, AlertLogic& logic, std::unique_ptr<IUdpSocket> socket,
                 const std::optional<ServerConfig::MqttSettings>& mqtt = std::nullopt,
-                std::optional<std::uint16_t> udp_port = std::nullopt);
+                std::optional<std::uint16_t> udp_port = std::nullopt,
+                std::unique_ptr<IBleScanner> ble_scanner = nullptr);
 
+    /** @brief Stops BLE scanning before the state its callback uses is destroyed. */
     ~AlertServer();
 
     /**
@@ -78,6 +86,12 @@ public:
     BleOutcome handleBleReading(common::protocol::Reading reading);
 
 private:
+    /**
+     * @brief Starts `scanner`, decoding each advertisement and passing it to handleBleReading().
+     * On failure the error is logged and BLE stays off; UDP keeps working.
+     */
+    void startBleScanner(std::unique_ptr<IBleScanner> scanner);
+
     /** @brief Runs alert logic, stores, and publishes a reading. Caller holds m_processing_mutex. */
     std::optional<AlertLogic::ComparisonResult> processReading(const common::protocol::Reading& reading);
 
@@ -90,4 +104,6 @@ private:
     // Readings arrive from the UDP loop and from the BLE scanner thread; the store,
     // alert logic and publishers are not thread-safe.
     std::mutex m_processing_mutex;
+    // Declared last so it is destroyed first: its thread calls into the members above.
+    std::unique_ptr<IBleScanner> m_ble_scanner;
 };

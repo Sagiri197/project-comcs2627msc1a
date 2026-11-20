@@ -1,6 +1,4 @@
 #include "alert_server.h"
-#include "ble_scanner.h"
-#include "common/ble_reading.h"
 #include "application.h"
 #include "server_config.h"
 
@@ -12,11 +10,7 @@
 #include <cstdlib>
 #include <exception>
 #include <iostream>
-#include <memory>
-#include <set>
 #include <string>
-#include <string_view>
-#include <utility>
 #include <thread>
 
 namespace {
@@ -75,37 +69,9 @@ int main(int argc, char** argv) {
             spdlog::info("MQTT disabled by configuration");
         }
         
-        AlertServer server(store, logic, {config.udp.bind_address, config.udp.port}, mqtt_config);
+        AlertServer server(store, logic, {config.udp.bind_address, config.udp.port}, mqtt_config,
+                           config.ble);
         spdlog::info("UDP server listening on port {}", config.udp.port);
-
-        // BLE fallback: nodes without WiFi advertise readings; same alert logic as UDP.
-        std::unique_ptr<IBleScanner> ble_scanner;
-        if (config.ble.enabled) {
-            try {
-                ble_scanner = make_ble_scanner(config.ble.adapter, common::ble::company_id);
-                // Runs on the BLE thread. A bad advertisement repeats too, so each distinct
-                // undecodable payload is reported once (the set is bounded).
-                ble_scanner->start([&server, undecodable = std::set<std::string>{}](
-                                       std::string_view manufacturer_data) mutable {
-                    if (auto reading = common::ble::decodeReading(manufacturer_data)) {
-                        server.handleBleReading(std::move(*reading));
-                        return;
-                    }
-                    if (undecodable.size() >= 256) undecodable.clear();
-                    if (undecodable.emplace(manufacturer_data).second) {
-                        spdlog::warn("Ignoring BLE advertisement that is not a valid reading ({} bytes)",
-                                     manufacturer_data.size());
-                    }
-                });
-                spdlog::info("BLE scanning enabled");
-            } catch (const std::exception& error) {
-                // UDP keeps working without BLE.
-                spdlog::error("BLE scanning unavailable: {}", error.what());
-                ble_scanner.reset();
-            }
-        } else {
-            spdlog::info("BLE scanning disabled by configuration");
-        }
 
         std::signal(SIGINT, request_stop);
         std::signal(SIGTERM, request_stop);

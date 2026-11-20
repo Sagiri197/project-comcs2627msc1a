@@ -1,5 +1,6 @@
 #include "alert_server.h"
 #include "fake_udp_client.h"
+#include "common/ble_reading.h"
 
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
@@ -371,6 +372,61 @@ TEST_F(AlertServerTest, BleReadingTakesLocationFromPreviousReading) {
     ASSERT_TRUE(stored);
     EXPECT_DOUBLE_EQ(stored->payload.location.longitude, earlier.payload.location.longitude);
     EXPECT_DOUBLE_EQ(stored->payload.location.latitude, earlier.payload.location.latitude);
+}
+
+// Records what the server does with the scanner it owns.
+struct FakeBleScannerState {
+    IBleScanner::Handler handler;
+    bool stopped = false;
+};
+
+class FakeBleScanner final : public IBleScanner {
+public:
+    FakeBleScanner(std::shared_ptr<FakeBleScannerState> state, bool fail_on_start = false)
+        : m_state(std::move(state)), m_fail_on_start(fail_on_start) {}
+    void start(Handler handler) override {
+        if (m_fail_on_start) throw std::runtime_error("no adapter");
+        m_state->handler = std::move(handler);
+    }
+    void stop() override { m_state->stopped = true; }
+
+private:
+    std::shared_ptr<FakeBleScannerState> m_state;
+    bool m_fail_on_start;
+};
+
+TEST(AlertServerBle, OwnsScannerAndProcessesDecodedAdvertisements) {
+    ReadingStore store{":memory:"};
+    AlertLogic logic{store};
+    auto state = std::make_shared<FakeBleScannerState>();
+    {
+        AlertServer server(store, logic, make_udp_socket({"127.0.0.1", 0}), std::nullopt, std::nullopt,
+                           std::make_unique<FakeBleScanner>(state));
+        ASSERT_TRUE(state->handler);
+
+        const auto advertisement = common::ble::encodeReading(ble_reading(1, 20.0));
+        ASSERT_TRUE(advertisement);
+        const auto decoded = common::ble::decodeReading(*advertisement);
+        ASSERT_TRUE(decoded);
+
+        state->handler("not a reading");   // ignored, logged once
+        state->handler(*advertisement);
+        EXPECT_TRUE(store.find(decoded->identity));
+        EXPECT_FALSE(state->stopped);
+    }
+    EXPECT_TRUE(state->stopped);
+}
+
+TEST(AlertServerBle, KeepsRunningWhenScannerCannotStart) {
+    ReadingStore store{":memory:"};
+    AlertLogic logic{store};
+    auto state = std::make_shared<FakeBleScannerState>();
+    std::unique_ptr<AlertServer> server;
+    EXPECT_NO_THROW(server = std::make_unique<AlertServer>(
+                        store, logic, make_udp_socket({"127.0.0.1", 0}), std::nullopt, std::nullopt,
+                        std::make_unique<FakeBleScanner>(state, true)));
+    server.reset();
+    EXPECT_FALSE(state->stopped);   // never started, so never owned
 }
 
 static_assert(!std::is_copy_constructible_v<AlertServer>);
