@@ -13,3 +13,6 @@
 [submodule "nodes/vendor/GotekLEDC68"]
 	path = nodes/vendor/GotekLEDC68
 	url = https://github.com/coopzone-dc/GotekLEDC68.git
+[submodule "server/vendor/SimpleBLE"]
+	path = server/vendor/SimpleBLE
+	url = https://github.com/simpleble/simpleble.git

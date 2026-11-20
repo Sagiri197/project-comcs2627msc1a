@@ -34,3 +34,24 @@ target_include_directories(libmosquitto_static PUBLIC
 )
 
 add_subdirectory(spdlog)
+
+# BLE scanning (SimpleBLE: BlueZ over D-Bus on Linux, WinRT on Windows/MSVC).
+if(WITH_BLE)
+    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/SimpleBLE/simpleble/CMakeLists.txt")
+        message(FATAL_ERROR
+            "SimpleBLE submodule is missing. Run:\n"
+            "  git submodule update --init --recursive server/vendor/SimpleBLE\n"
+            "or configure with -DWITH_BLE=OFF to build without the BLE fallback.")
+    endif()
+    set(SIMPLEBLE_INSTALL OFF CACHE BOOL "" FORCE)
+    # SimpleBLE compiles its own header-only fmt; on MSVC a static simpleble.lib then clashes
+    # with spdlog's bundled fmt at link time (LNK2005). A DLL keeps both copies private.
+    if(MSVC)
+        set(_saved_build_shared_libs ${BUILD_SHARED_LIBS})
+        set(BUILD_SHARED_LIBS ON)
+    endif()
+    add_subdirectory(SimpleBLE/simpleble EXCLUDE_FROM_ALL)
+    if(MSVC)
+        set(BUILD_SHARED_LIBS ${_saved_build_shared_libs})
+    endif()
+endif()

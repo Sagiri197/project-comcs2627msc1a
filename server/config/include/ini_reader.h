@@ -24,6 +24,12 @@ public:
         parse(input);
     }
 
+    /** @brief Returns whether `key` exists in `section`. */
+    bool has(const std::string& section, const std::string& key) const {
+        const auto section_it = m_values.find(section);
+        return section_it != m_values.end() && section_it->second.count(key) > 0;
+    }
+
     std::string get(const std::string& section, const std::string& key) const {
         const auto section_it = m_values.find(section);
         if (section_it == m_values.end()) {

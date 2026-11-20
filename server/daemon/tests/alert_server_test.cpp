@@ -1,5 +1,6 @@
 #include "alert_server.h"
 #include "fake_udp_client.h"
+#include "common/ble_reading.h"
 
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
@@ -316,6 +317,116 @@ TEST_F(AlertServerTest, DatabaseFailureSendsNoAcknowledgementAndAllowsRetry) {
     EXPECT_TRUE(std::holds_alternative<Ack>(decode(disk_client->receive())));
     ReadingStore observer(path);
     EXPECT_TRUE(observer.find(reading().identity));
+}
+
+Reading ble_reading(std::uint32_t seq, double temperature) {
+    auto result = reading(Qos::BestEffort);
+    result.identity.seq = seq;
+    result.payload.location = {0.0, 0.0};   // BLE readings carry no location
+    result.payload.temperature = temperature;
+    return result;
+}
+
+TEST_F(AlertServerTest, ProcessesBleReadingsWithTheSameAlertLogic) {
+    const auto first = server.handleBleReading(ble_reading(1, 20.0));
+    EXPECT_TRUE(first.processed);
+    EXPECT_FALSE(first.comparison);   // no prior reading from this node
+    EXPECT_TRUE(store.find(ble_reading(1, 20.0).identity));
+
+    const auto second = server.handleBleReading(ble_reading(2, 25.0));
+    EXPECT_TRUE(second.processed);
+    ASSERT_TRUE(second.comparison);
+    EXPECT_DOUBLE_EQ(second.comparison->temperature_diff, 5.0);
+    EXPECT_TRUE(second.comparison->exceeds_temp_threshold);
+
+    // BLE is one-way: nothing is sent back to anyone.
+    peer->expect_no_reply();
+}
+
+TEST_F(AlertServerTest, IgnoresRepeatedBleAdvertisements) {
+    EXPECT_TRUE(server.handleBleReading(ble_reading(1, 20.0)).processed);
+    const auto repeat = server.handleBleReading(ble_reading(1, 20.0));
+    EXPECT_FALSE(repeat.processed);
+    EXPECT_FALSE(repeat.comparison);
+}
+
+TEST_F(AlertServerTest, IgnoresBleReadingAlreadyReceivedOverUdp) {
+    peer->send(encode(reading()), server_endpoint);
+    server.receive();
+    peer->receive();   // ACK
+
+    auto same = reading(Qos::BestEffort);
+    same.payload.location = {0.0, 0.0};
+    EXPECT_FALSE(server.handleBleReading(same).processed);
+}
+
+TEST_F(AlertServerTest, BleReadingTakesLocationFromPreviousReading) {
+    auto earlier = reading();
+    earlier.identity.seq = 1;
+    peer->send(encode(earlier), server_endpoint);
+    server.receive();
+    peer->receive();   // ACK
+
+    ASSERT_TRUE(server.handleBleReading(ble_reading(2, 23.4)).processed);
+    const auto stored = store.find(ble_reading(2, 23.4).identity);
+    ASSERT_TRUE(stored);
+    EXPECT_DOUBLE_EQ(stored->payload.location.longitude, earlier.payload.location.longitude);
+    EXPECT_DOUBLE_EQ(stored->payload.location.latitude, earlier.payload.location.latitude);
+}
+
+// Records what the server does with the scanner it owns.
+struct FakeBleScannerState {
+    IBleScanner::Handler handler;
+    bool stopped = false;
+};
+
+class FakeBleScanner final : public IBleScanner {
+public:
+    FakeBleScanner(std::shared_ptr<FakeBleScannerState> state, bool fail_on_start = false)
+        : m_state(std::move(state)), m_fail_on_start(fail_on_start) {}
+    void start(Handler handler) override {
+        if (m_fail_on_start) throw std::runtime_error("no adapter");
+        m_state->handler = std::move(handler);
+    }
+    void stop() override { m_state->stopped = true; }
+
+private:
+    std::shared_ptr<FakeBleScannerState> m_state;
+    bool m_fail_on_start;
+};
+
+TEST(AlertServerBle, OwnsScannerAndProcessesDecodedAdvertisements) {
+    ReadingStore store{":memory:"};
+    AlertLogic logic{store};
+    auto state = std::make_shared<FakeBleScannerState>();
+    {
+        AlertServer server(store, logic, make_udp_socket({"127.0.0.1", 0}), std::nullopt, std::nullopt,
+                           std::make_unique<FakeBleScanner>(state));
+        ASSERT_TRUE(state->handler);
+
+        const auto advertisement = common::ble::encodeReading(ble_reading(1, 20.0));
+        ASSERT_TRUE(advertisement);
+        const auto decoded = common::ble::decodeReading(*advertisement);
+        ASSERT_TRUE(decoded);
+
+        state->handler("not a reading");   // ignored, logged once
+        state->handler(*advertisement);
+        EXPECT_TRUE(store.find(decoded->identity));
+        EXPECT_FALSE(state->stopped);
+    }
+    EXPECT_TRUE(state->stopped);
+}
+
+TEST(AlertServerBle, KeepsRunningWhenScannerCannotStart) {
+    ReadingStore store{":memory:"};
+    AlertLogic logic{store};
+    auto state = std::make_shared<FakeBleScannerState>();
+    std::unique_ptr<AlertServer> server;
+    EXPECT_NO_THROW(server = std::make_unique<AlertServer>(
+                        store, logic, make_udp_socket({"127.0.0.1", 0}), std::nullopt, std::nullopt,
+                        std::make_unique<FakeBleScanner>(state, true)));
+    server.reset();
+    EXPECT_FALSE(state->stopped);   // never started, so never owned
 }
 
 static_assert(!std::is_copy_constructible_v<AlertServer>);

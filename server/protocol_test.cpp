@@ -1,6 +1,9 @@
 #ifndef ARDUINO
 #include "protocol.h"
+#include "ble_reading.h"
 #include "mqtt_topics.h"
+
+#include <algorithm>
 
 #include <gtest/gtest.h>
 #include <nlohmann/json.hpp>
@@ -360,6 +363,65 @@ TEST(Protocol, EnforcesEncodedDatagramSizeAfterJsonEscaping) {
     } catch (const ProtocolError& error) {
         EXPECT_EQ(error.code(), ErrorCode::DatagramTooLarge);
     }
+}
+
+Reading ble_reading() {
+    return {{"esp32-001", "boot-3735928559", 42}, Qos::BestEffort,
+            {"urn:ngsi-ld:WeatherObserved:esp32-001:boot-3735928559:42", "2026-11-02T14:30:01Z",
+             {0.0, 0.0}, "urn:ngsi-ld:Device:esp32-001", -12.34, 0.5678}};
+}
+
+TEST(BleReading, RoundTripsAReadingInOneLegacyAdvertisement) {
+    const auto payload = common::ble::encodeReading(ble_reading());
+    ASSERT_TRUE(payload);
+    EXPECT_EQ(payload->size(), common::ble::payload_size);
+    // AD length + type + company id + payload must fit the 31-byte legacy advertisement.
+    EXPECT_LE(4 + payload->size(), 31u);
+
+    const auto decoded = common::ble::decodeReading(*payload);
+    ASSERT_TRUE(decoded);
+    // Same JSON as the original: identity, ids, timestamp and values survive the trip.
+    EXPECT_EQ(encode(*decoded), encode(ble_reading()));
+}
+
+TEST(BleReading, CarriesTimeSynchronizationFlag) {
+    auto original = ble_reading();
+    original.time_synchronized = false;
+    const auto decoded = common::ble::decodeReading(*common::ble::encodeReading(original));
+    ASSERT_TRUE(decoded);
+    EXPECT_FALSE(decoded->time_synchronized);
+}
+
+TEST(BleReading, RejectsReadingsThatDoNotFit) {
+    auto long_node = ble_reading();
+    long_node.identity.node_id = "esp32-00001";
+    EXPECT_FALSE(common::ble::encodeReading(long_node));
+
+    auto foreign_session = ble_reading();
+    foreign_session.identity.session_id = "c79e4fd8-5888-4ae5-8556-c1e558aa6020";
+    EXPECT_FALSE(common::ble::encodeReading(foreign_session));
+
+    auto bad_time = ble_reading();
+    bad_time.payload.date_observed = "2026-11-02T14:30:01.5Z";
+    EXPECT_FALSE(common::ble::encodeReading(bad_time));
+
+    auto bad_humidity = ble_reading();
+    bad_humidity.payload.relative_humidity = 1.5;
+    EXPECT_FALSE(common::ble::encodeReading(bad_humidity));
+}
+
+TEST(BleReading, IgnoresForeignOrTruncatedPayloads) {
+    auto payload = *common::ble::encodeReading(ble_reading());
+    EXPECT_FALSE(common::ble::decodeReading(payload.substr(0, payload.size() - 1)));
+    EXPECT_FALSE(common::ble::decodeReading(""));
+
+    auto wrong_magic = payload;
+    wrong_magic[0] = 0x01;
+    EXPECT_FALSE(common::ble::decodeReading(wrong_magic));
+
+    auto no_node = payload;
+    std::fill(no_node.begin() + 17, no_node.end(), '\0');
+    EXPECT_FALSE(common::ble::decodeReading(no_node));
 }
 
 }

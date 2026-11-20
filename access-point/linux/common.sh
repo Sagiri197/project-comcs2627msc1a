@@ -6,8 +6,9 @@ set -euo pipefail
 AP_SCRIPTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # access-point/linux
 AP_DIR="$(cd "$AP_SCRIPTS_DIR/.." && pwd)"                        # access-point (ap.env)
 
-# NetworkManager profile created by access-point.sh while it runs.
+# NetworkManager profiles created by access-point.sh while it runs.
 AP_CON=comcs-ap
+ETH_CON=comcs-eth
 
 # shellcheck source=../ap.env
 source "$AP_DIR/ap.env"

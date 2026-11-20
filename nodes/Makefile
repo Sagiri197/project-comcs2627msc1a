@@ -2,10 +2,13 @@ SHELL := /bin/sh
 # Run from this folder (cd nodes) or from the repo root with: make -C nodes <target>
 
 ARDUINO_CLI ?= arduino-cli
-FQBN ?= esp32:esp32:esp32s3
-FQBN_1 ?= esp32:esp32:esp32
-FQBN_2 ?= esp32:esp32:esp32s3
-FQBN_3 ?= esp32:esp32:esp32s3
+# WiFi + MQTT + BLE do not fit the default 1.25 MB app partition (classic ESP32: ~140%), so
+# the nodes use huge_app (3 MB app, ~900 KB SPIFFS for the spools, no OTA).
+PARTITION ?= huge_app
+FQBN ?= esp32:esp32:esp32s3:PartitionScheme=$(PARTITION)
+FQBN_1 ?= esp32:esp32:esp32:PartitionScheme=$(PARTITION)
+FQBN_2 ?= esp32:esp32:esp32s3:PartitionScheme=$(PARTITION)
+FQBN_3 ?= esp32:esp32:esp32s3:PartitionScheme=$(PARTITION)
 SKETCH ?= sketch
 BUILD_ROOT ?= build
 
@@ -13,7 +16,7 @@ NODES ?= 1 2 3
 # Node for `make monitor` / `make flash-monitor`, and the baud rate (serial_baud in
 # sketch/src/configs/*.h).
 NODE ?= 1
-BAUD ?= 9600
+BAUD ?= 115200
 
 # Serial ports per platform. PLATFORM is detected and can be forced: make flash PLATFORM=linux
 # Windows: OS=Windows_NT (native make), or uname MINGW*/MSYS*/CYGWIN* (Git Bash / MSYS2 make,
@@ -27,7 +30,7 @@ endif
 
 ifeq ($(PLATFORM),windows)
 PORT_1 ?= COM3
-PORT_2 ?= COM9
+PORT_2 ?= COM10
 PORT_3 ?= COM5
 else ifeq ($(PLATFORM),linux)
 PORT_1 ?= /dev/ttyUSB0
@@ -40,7 +43,7 @@ endif
 # Serial monitor ports. Each one defaults to the node's flashing port; set it when the board
 # has a separate USB port for serial output (e.g. ESP32-S3 native USB vs. UART bridge).
 MONITOR_PORT_1 ?= $(PORT_1)
-MONITOR_PORT_2 ?= $(PORT_2)
+MONITOR_PORT_2 ?= COM9
 MONITOR_PORT_3 ?= $(PORT_3)
 
 .PHONY: help ports compile compile-node flash flash-node monitor flash-monitor clean

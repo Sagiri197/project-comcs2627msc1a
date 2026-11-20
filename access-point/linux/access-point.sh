@@ -6,6 +6,17 @@
 # address and leave. Ctrl+C (or SIGTERM) removes the access point, and the Wi-Fi interface
 # goes back to its normal connection.
 #
+# With ETH_IFACE set (ap.env), a laptop plugged into that Ethernet port gets an address by
+# DHCP on ETH_ADDRESS/24 and reaches this host (e.g. Node-RED at http://ETH_ADDRESS:1880).
+#
+# Every connection must be accepted: until then the device's traffic is blocked, and after
+# ACCEPT_TIMEOUT seconds (ap.env) without an answer it is declined. Commands, typed while
+# it runs (n = the device number shown in the log, or its MAC):
+#   a [n]   accept (no n: the oldest waiting device)
+#   d [n]   decline: kick it; if it tries again it is asked about again
+#   k n     disconnect a device; if it comes back it is asked about again
+#   l       list the devices          h   help
+#
 # Usage: access-point/linux/access-point.sh      (asks for sudo)
 # Settings:  access-point/ap.env (overrides in access-point/ap.env.local)
 # DNS names: access-point/dns.txt, "hostname ipAddress" per line, reloaded when it changes
@@ -14,7 +25,7 @@ require_root "$@"
 
 for arg in "$@"; do
     case "$arg" in
-        -h|--help) sed -n '2,11s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"; exit 0 ;;
+        -h|--help) sed -n '2,19s/^# \{0,1\}//p' "${BASH_SOURCE[0]}"; exit 0 ;;
         *)         die "unknown option '$arg' (see --help)" ;;
     esac
 done
@@ -27,8 +38,18 @@ NTP_LOCAL_STRATUM=10                # stratum advertised when serving the Pi's o
 DNSMASQ_CONF=/etc/NetworkManager/dnsmasq-shared.d/comcs.conf
 CHRONY_CONF=/etc/chrony/conf.d/comcs.conf
 DNS_HOSTS=/run/comcs-dns.hosts      # names from dns.txt, read by dnsmasq (addn-hosts)
+ETC_HOSTS=/etc/hosts                # this host's own resolver: gets the cell's .lan names
+HOSTS_BEGIN="# BEGIN comcs access-point: .lan names from access-point/dns.txt, removed when it stops"
+HOSTS_END="# END comcs access-point"
 LEASES=/var/lib/NetworkManager/dnsmasq-$WIFI_IFACE.leases
 POLL_SECS=2
+NFT_TABLE=comcs                     # nftables table "inet comcs": blocks devices not accepted yet
+ACCEPT_TIMEOUT=${ACCEPT_TIMEOUT:-60}
+ETH_IFACE=${ETH_IFACE:-}
+ETH_ADDRESS=${ETH_ADDRESS:-192.168.60.1}
+ETH_PREFIX=24
+ETH_STATE=off                       # off | up | waiting (no cable yet; NetworkManager starts it on plug-in)
+[[ "$ACCEPT_TIMEOUT" =~ ^[0-9]+$ ]] || die "ACCEPT_TIMEOUT must be a number of seconds (access-point/ap.env)"
 
 if [[ -t 1 ]]; then
     B=$'\e[1m' D=$'\e[2m' R=$'\e[31m' G=$'\e[32m' Y=$'\e[33m' C=$'\e[36m' N=$'\e[0m'
@@ -38,13 +59,25 @@ fi
 
 # ---- checks -----------------------------------------------------------------------------
 missing=()
-for cmd in nmcli iw ip dnsmasq chronyd; do command -v "$cmd" >/dev/null || missing+=("$cmd"); done
+for cmd in nmcli iw ip dnsmasq chronyd nft; do command -v "$cmd" >/dev/null || missing+=("$cmd"); done
 if (( ${#missing[@]} )); then
     die "missing: ${missing[*]}. Install them with:" \
-        "sudo apt-get install network-manager iw rfkill dnsmasq-base chrony"
+        "sudo apt-get install network-manager iw rfkill dnsmasq-base chrony nftables"
 fi
 (( ${#AP_PASSWORD} >= 8 )) || die "AP_PASSWORD must have at least 8 characters (access-point/ap.env)"
 ip link show "$WIFI_IFACE" >/dev/null 2>&1 || die "no interface '$WIFI_IFACE' (WIFI_IFACE in access-point/ap.env)"
+if [[ -n "$ETH_IFACE" ]]; then
+    [[ "$ETH_ADDRESS" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]] || die "ETH_ADDRESS must be an IPv4 address (access-point/ap.env)"
+    if ! ip link show "$ETH_IFACE" >/dev/null 2>&1; then
+        warn "no interface '$ETH_IFACE' (ETH_IFACE in access-point/ap.env): Ethernet is not set up"
+        ETH_IFACE=
+    elif [[ -n "$(ip -4 route show default dev "$ETH_IFACE" 2>/dev/null)" ]]; then
+        # Taking it over would cut this host's (and the clients') Internet.
+        warn "$ETH_IFACE is this host's Internet uplink: it is left alone (no laptop port)"
+        ETH_IFACE=
+    fi
+fi
+ETH_LEASES=/var/lib/NetworkManager/dnsmasq-${ETH_IFACE:-none}.leases
 
 # ---- teardown (runs on Ctrl+C, SIGTERM, errors and normal exit) ---------------------------
 started=0
@@ -55,12 +88,16 @@ cleanup() {
     echo
     log "Stopping: removing the access point"
     nmcli connection delete "$AP_CON" >/dev/null 2>&1 || true
+    nmcli connection delete "$ETH_CON" >/dev/null 2>&1 || true
+    nft delete table inet "$NFT_TABLE" 2>/dev/null || true
     rm -f "$DNSMASQ_CONF" "$DNS_HOSTS" "$DNS_HOSTS.tmp"
+    DNS_ENTRIES=()
+    update_etc_hosts || true
     if [[ -f "$CHRONY_CONF" ]]; then
         rm -f "$CHRONY_CONF"
         systemctl restart chrony 2>/dev/null || true
     fi
-    log "Access point removed. $WIFI_IFACE is back to its normal Wi-Fi."
+    log "Access point removed. $WIFI_IFACE is back to its normal Wi-Fi${ETH_IFACE:+, $ETH_IFACE to its normal connection}."
 }
 trap cleanup EXIT
 trap 'exit 130' INT
@@ -116,14 +153,42 @@ write_dns_hosts() {
         printf '%s\n' "${DNS_ENTRIES[@]}"
     } > "$DNS_HOSTS.tmp"
     mv -f "$DNS_HOSTS.tmp" "$DNS_HOSTS"
+    update_etc_hosts || "$1" "could not update $ETC_HOSTS: programs on this host may not resolve the .lan names"
+}
+
+# This host's own programs (the alert server, ...) resolve through /etc/hosts and its normal
+# DNS, not through the dnsmasq it runs for the clients. So the cell's own names (those ending
+# in .lan, e.g. cc.comcs.lan) also go into a marked block at the top of /etc/hosts (first match
+# wins). The public names that dns.txt redirects for the clients (pool.ntp.org, ...) are left
+# out: chrony here must keep reaching the real servers. An empty DNS_ENTRIES removes the block.
+# Rewritten in place (cat >), which keeps the file's owner, mode and inode.
+update_etc_hosts() {
+    local entry name tmp=/run/comcs-etc-hosts.tmp
+    {
+        if (( ${#DNS_ENTRIES[@]} )); then
+            echo "$HOSTS_BEGIN"
+            for entry in "${DNS_ENTRIES[@]}"; do
+                name=${entry#* }
+                [[ "${name,,}" == *.lan ]] && echo "$entry"
+            done
+            echo "$HOSTS_END"
+        fi
+        awk -v b="$HOSTS_BEGIN" -v e="$HOSTS_END" '$0 == b { skip = 1; next } $0 == e { skip = 0; next } !skip' "$ETC_HOSTS"
+    } > "$tmp" && cat "$tmp" > "$ETC_HOSTS"
+    local status=$?
+    rm -f "$tmp"
+    return "$status"
 }
 
 # SIGHUP makes dnsmasq re-read its addn-hosts files and clear its cache (leases are kept).
+# NetworkManager runs one dnsmasq per shared interface (Wi-Fi, and Ethernet if set up).
 reload_dnsmasq() {
-    local pid
-    pid="$(pgrep -f "dnsmasq.*--listen-address=$AP_ADDRESS" | head -n1 || true)"
-    [[ -n "$pid" ]] || pid="$(pgrep -f 'dnsmasq.*dnsmasq-shared\.d' | head -n1 || true)"
-    [[ -n "$pid" ]] && kill -HUP "$pid" 2>/dev/null
+    local pids
+    pids="$(pgrep -f 'dnsmasq.*dnsmasq-shared\.d' || true)"
+    [[ -n "$pids" ]] || pids="$(pgrep -f "dnsmasq.*--listen-address=($AP_ADDRESS|$ETH_ADDRESS)" || true)"
+    [[ -n "$pids" ]] || return 1
+    # shellcheck disable=SC2086
+    kill -HUP $pids 2>/dev/null
 }
 
 start_access_point() {
@@ -139,6 +204,28 @@ start_access_point() {
     # Leftovers from a run that was killed (kill -9, power loss), or from older versions.
     nmcli connection delete "$AP_CON" >/dev/null 2>&1 || true
     nmcli connection delete comcs-client >/dev/null 2>&1 || true
+    nmcli connection delete "$ETH_CON" >/dev/null 2>&1 || true
+    nft delete table inet "$NFT_TABLE" 2>/dev/null || true
+
+    # Admission control: WPA2 lets anyone with the password associate, so a new device is
+    # held at the IP level instead: everything it sends to this host (DHCP, DNS, NTP, alert
+    # server) or through it (Internet, the Command Centre) is dropped until it is accepted,
+    # i.e. its MAC is added to the "approved" set. Created before the AP comes up, so no
+    # device gets through in between.
+    log "Blocking devices on $WIFI_IFACE until they are accepted (nftables table inet $NFT_TABLE)"
+    nft -f - <<EOF
+table inet $NFT_TABLE {
+    set approved { type ether_addr; }
+    chain input {
+        type filter hook input priority -10; policy accept;
+        iifname "$WIFI_IFACE" ether saddr != @approved drop
+    }
+    chain forward {
+        type filter hook forward priority -10; policy accept;
+        iifname "$WIFI_IFACE" ether saddr != @approved drop
+    }
+}
+EOF
 
     log "Creating access point '$AP_SSID' on $WIFI_IFACE"
     # autoconnect no: the AP only exists while this program runs, not after a reboot.
@@ -165,9 +252,14 @@ start_access_point() {
         # point at it too, so ESP32 code using the usual defaults syncs without Internet.
         # chrony resolves through the uplink, not this dnsmasq, so there is no loop.
         printf 'dhcp-option=option:ntp-server,%s\n' "$AP_ADDRESS"
+        # The Ethernet laptop gets no default gateway (an empty router option; dnsmasq tags
+        # each request with the interface it came in on), so its Internet stays on its own
+        # Wi-Fi instead of going through this host.
+        [[ -z "$ETH_IFACE" ]] || printf 'dhcp-option=tag:%s,option:router\n' "$ETH_IFACE"
     } > "$DNSMASQ_CONF"
 
     nmcli --wait 30 connection up "$AP_CON" >/dev/null
+    start_ethernet
 
     # With Internet chrony relays the public pools; without, "local" keeps it serving this
     # machine's own clock instead of refusing.
@@ -179,6 +271,25 @@ local stratum $NTP_LOCAL_STRATUM
 EOF
     systemctl enable --now chrony >/dev/null 2>&1 || true
     systemctl restart chrony
+}
+
+# Laptop port: ETH_IFACE in shared mode on its own subnet (DHCP + the same DNS names).
+# Kept in memory only (save no) and autoconnecting, so plugging the cable in later, or
+# re-plugging it, brings it up; it never outlives this program, not even across a reboot.
+start_ethernet() {
+    [[ -n "$ETH_IFACE" ]] || return 0
+    log "Setting up $ETH_IFACE for a laptop: $ETH_ADDRESS/$ETH_PREFIX, DHCP, no gateway"
+    rm -f "$ETH_LEASES"
+    nmcli connection add save no type ethernet ifname "$ETH_IFACE" con-name "$ETH_CON" \
+        autoconnect yes connection.autoconnect-priority 100 \
+        ipv4.method shared ipv4.addresses "$ETH_ADDRESS/$ETH_PREFIX" \
+        ipv6.method disabled >/dev/null
+    if [[ "$(cat "/sys/class/net/$ETH_IFACE/carrier" 2>/dev/null)" == 1 ]] &&
+       nmcli --wait 20 connection up "$ETH_CON" >/dev/null 2>&1; then
+        ETH_STATE=up
+    else
+        ETH_STATE=waiting
+    fi
 }
 
 print_banner() {
@@ -196,6 +307,10 @@ print_banner() {
     else
         row "Internet"   "${Y}none${N} (no uplink: clients only reach this network)"
     fi
+    if [[ "$ETH_STATE" != off ]]; then
+        row "Ethernet"   "$ETH_IFACE  $ETH_ADDRESS/$ETH_PREFIX   DHCP for a laptop (no gateway)$([[ "$ETH_STATE" == waiting ]] && printf '  %s' "${Y}no cable yet: starts when plugged in${N}")"
+        row ""           "Node-RED ${B}http://$ETH_ADDRESS:1880${N}   dashboard /dashboard   MQTT $ETH_ADDRESS:$MQTT_PORT"
+    fi
     row "NTP"          "$AP_ADDRESS udp/123"
     [[ -n "$uplink" ]] || row "" "${Y}serving this host's own clock: check it with 'date' (fix: access-point/linux/set-time.sh)${N}"
     row "DNS"          "${#DNS_ENTRIES[@]} names from access-point/dns.txt ${D}(edit it any time: reloaded automatically)${N}"
@@ -208,11 +323,12 @@ print_banner() {
     printf '    %-16s %s\n' server_address "${D}alert server name from dns.txt, UDP $ALERT_SERVER_UDP_PORT${N}"
     printf '    %-16s %s\n' mqtt_host "${D}broker name from dns.txt, TCP $MQTT_PORT${N}"
     echo
-    echo "${B}Devices${N}"
+    echo "${B}Devices${N}   ${D}new devices are blocked until accepted (auto-decline after ${ACCEPT_TIMEOUT}s)${N}"
+    echo "  ${D}type: a [n] accept   d [n] decline   k n disconnect   l list   h help   (then Enter)${N}"
 }
 
 # ---- device log -------------------------------------------------------------------------
-declare -A CONNECTED=() IPS=() HOSTS=()
+declare -A CONNECTED=() IPS=() HOSTS=() ETH_IPS=()
 
 event() { printf '  %s  %b\n' "$(printf '%(%H:%M:%S)T' -1)" "$*"; }
 
@@ -229,6 +345,98 @@ name_of() {
     printf '%s%s' "$mac" "${name:+ ($name)}"
 }
 
+# ---- admission: accept / decline / disconnect ----------------------------------------------
+# Per associated device: STATE pending (blocked, waiting for an answer) or accepted.
+# Every connection is a new request: a device that leaves, is declined or is disconnected is
+# asked about again when it reconnects.
+declare -A STATE=() PENDING_SINCE=() ID=() KICKED=()
+NEXT_ID=1           # devices get a short number, kept for the whole run, for the commands
+
+# "[3] aa:bb:cc:00:00:03 (esp32-003)"
+label() { printf '[%s] %s' "${ID[$1]:-?}" "$(name_of "$1")"; }
+
+# Event with a coloured, aligned verb: verb_event COLOUR VERB TEXT.
+verb_event() { event "$1$(printf '%-15s' "$2")${N} $3"; }
+
+# Deauthenticates a station. The device may reconnect by itself; what happens then depends on
+# the caller (declined: refused again; disconnected: asked about again).
+kick_station() {
+    iw dev "$WIFI_IFACE" station del "$1" 2>/dev/null && return 0
+    event "${R}! could not disconnect $(label "$1") ('iw station del' failed); its traffic stays blocked${N}"
+    return 1
+}
+
+nft_approve() {
+    nft add element inet "$NFT_TABLE" approved "{ $1 }" && return 0
+    event "${R}! could not unblock $(label "$1") (nft failed); is table inet $NFT_TABLE still there?${N}"
+    return 1
+}
+nft_unapprove() { nft delete element inet "$NFT_TABLE" approved "{ $1 }" 2>/dev/null || true; }
+
+accept_device() {
+    local mac=$1
+    if [[ "${STATE[$mac]}" == accepted ]]; then
+        event "${D}$(label "$mac") is already accepted${N}"
+        return 0
+    fi
+    nft_approve "$mac" || return 0
+    STATE[$mac]=accepted
+    unset 'PENDING_SINCE[$mac]' 'KICKED[$mac]'
+    verb_event "$G" "+ accepted" "$(label "$mac")"
+}
+
+# decline_device MAC REASON: kick it. If it tries again it is a new request.
+decline_device() {
+    local mac=$1
+    KICKED[$mac]=$2
+    STATE[$mac]=declined
+    unset 'PENDING_SINCE[$mac]'
+    nft_unapprove "$mac"
+    kick_station "$mac" || true
+}
+
+# Disconnects an accepted device. If it comes back it is a new request.
+disconnect_device() {
+    local mac=$1 now
+    printf -v now '%(%s)T' -1
+    nft_unapprove "$mac"
+    STATE[$mac]=pending
+    PENDING_SINCE[$mac]=$now
+    KICKED[$mac]="disconnected by you"
+    kick_station "$mac" || true
+}
+
+# A new station (every connection, also a retry after a decline): held until answered.
+new_station() {
+    local mac=$1 sig=$2 now=$3
+    [[ -n "${ID[$mac]:-}" ]] || { ID[$mac]=$NEXT_ID; NEXT_ID=$(( NEXT_ID + 1 )); }
+
+    CONNECTED[$mac]=$now
+    STATE[$mac]=pending
+    PENDING_SINCE[$mac]=$now
+    verb_event "$Y" "? request" "$(label "$mac")${sig:+  signal $sig dBm}   ${B}a ${ID[$mac]}${N} accept, ${B}d ${ID[$mac]}${N} decline ${D}(auto-decline in ${ACCEPT_TIMEOUT}s)${N}"
+}
+
+# A station that left (by itself or kicked).
+station_gone() {
+    local mac=$1 now=$2 reason=${KICKED[$mac]:-} after
+    after="after $(fmt_duration $(( now - CONNECTED[$mac] )))"
+    case "$reason" in
+        declined|auto-declined)
+            verb_event "$R" "x $reason" "$(label "$mac")" ;;
+        "disconnected by you")
+            verb_event "$R" "- disconnected" "$(label "$mac")${IPS[$mac]:+  ${IPS[$mac]}}  $after  ${D}(by you)${N}" ;;
+        *)
+            if [[ "${STATE[$mac]:-}" == accepted ]]; then
+                verb_event "$R" "- disconnected" "$(label "$mac")${IPS[$mac]:+  ${IPS[$mac]}}  $after"
+            else
+                verb_event "$R" "- left" "$(label "$mac")  ${D}(was waiting to be accepted)${N}"
+            fi ;;
+    esac
+    nft_unapprove "$mac"
+    unset 'CONNECTED[$mac]' 'IPS[$mac]' 'STATE[$mac]' 'PENDING_SINCE[$mac]' 'KICKED[$mac]'
+}
+
 poll_devices() {
     local -A seen=()
     local mac sig ip host now
@@ -238,27 +446,39 @@ poll_devices() {
     while read -r mac sig; do
         [[ -n "$mac" ]] && seen[$mac]=$sig
     done < <(iw dev "$WIFI_IFACE" station dump 2>/dev/null | awk '
-        /^Station/ { mac = $2; sig[mac] = "" }
+        /^Station/ { mac = tolower($2); sig[mac] = "" }
         /signal:/  { sig[mac] = $2 }
         END        { for (m in sig) print m, sig[m] }')
 
     for mac in "${!seen[@]}"; do
         if [[ -z "${CONNECTED[$mac]:-}" ]]; then
-            CONNECTED[$mac]=$now
-            event "${G}+ connected${N}     $(name_of "$mac")${seen[$mac]:+  signal ${seen[$mac]} dBm}"
+            new_station "$mac" "${seen[$mac]}" "$now" || true
+        elif [[ "${STATE[$mac]}" == declined ]]; then
+            kick_station "$mac" >/dev/null 2>&1 || true      # still there: try again quietly
         fi
     done
     for mac in "${!CONNECTED[@]}"; do
         if [[ -z "${seen[$mac]+x}" ]]; then
-            event "${R}- disconnected${N}  $(name_of "$mac")${IPS[$mac]:+  ${IPS[$mac]}}  after $(fmt_duration $(( now - CONNECTED[$mac] )))"
-            unset 'CONNECTED[$mac]' 'IPS[$mac]'
+            station_gone "$mac" "$now"
+        elif [[ "${STATE[$mac]}" == pending ]] && (( now - PENDING_SINCE[$mac] >= ACCEPT_TIMEOUT )); then
+            decline_device "$mac" auto-declined
         fi
     done
 
-    # DHCP leases: "<expiry> <mac> <ip> <hostname> <client-id>".
+    # Ethernet laptop: no admission control (it is plugged in by hand), just log its address.
+    if [[ "$ETH_STATE" != off && -r "$ETH_LEASES" ]]; then
+        while read -r _ mac ip host _; do
+            [[ -n "${ip:-}" && "${ETH_IPS[$mac]:-}" != "$ip" ]] || continue
+            ETH_IPS[$mac]=$ip
+            HOSTS[$mac]=$host
+            event "${C}= ethernet${N}      $(name_of "$mac")  ->  ${B}$ip${N}   ${D}Node-RED http://$ETH_ADDRESS:1880${N}"
+        done < "$ETH_LEASES"
+    fi
+
+    # DHCP leases: "<expiry> <mac> <ip> <hostname> <client-id>". Only accepted devices get one.
     [[ -r "$LEASES" ]] || return 0
     while read -r _ mac ip host _; do
-        [[ -n "${ip:-}" && -n "${CONNECTED[$mac]:-}" ]] || continue
+        [[ -n "${ip:-}" && -n "${CONNECTED[$mac]:-}" && "${STATE[$mac]:-}" == accepted ]] || continue
         if [[ "${IPS[$mac]:-}" != "$ip" ]]; then
             IPS[$mac]=$ip
             HOSTS[$mac]=$host
@@ -301,8 +521,114 @@ check_access_point() {
     fi
 }
 
+# ---- commands typed while it runs -------------------------------------------------------
+cmd_error() { event "${R}! $*${N}  ${D}(h for help)${N}"; }
+
+# Sets RESOLVED to the connected device named by $1: its number, its MAC, or (empty) the
+# device that has been waiting longest. Returns 1, after reporting why, if there is none.
+RESOLVED=
+resolve_device() {
+    local arg=${1,,} mac best=
+    RESOLVED=
+    if [[ -z "$arg" ]]; then
+        for mac in "${!PENDING_SINCE[@]}"; do
+            if [[ -z "$best" ]] || (( PENDING_SINCE[$mac] < PENDING_SINCE[$best] )); then best=$mac; fi
+        done
+        [[ -n "$best" ]] || { cmd_error "no device is waiting to be accepted"; return 1; }
+        RESOLVED=$best
+        return 0
+    fi
+    for mac in "${!CONNECTED[@]}"; do
+        if [[ "$arg" == "${ID[$mac]}" || "$arg" == "$mac" ]]; then RESOLVED=$mac; return 0; fi
+    done
+    cmd_error "no connected device '$1' (l lists them)"
+    return 1
+}
+
+list_devices() {
+    local mac now state
+    printf -v now '%(%s)T' -1
+    if (( ${#CONNECTED[@]} == 0 )); then
+        event "${D}no devices connected${N}"
+        return 0
+    fi
+    event "${B}connected devices${N}"
+    while read -r _ mac; do
+        state=${STATE[$mac]}
+        if [[ "$state" == pending ]]; then
+            state="${Y}waiting $(( now - PENDING_SINCE[$mac] ))s/${ACCEPT_TIMEOUT}s${N}"
+        elif [[ "$state" == accepted ]]; then
+            state="${G}accepted${N}"
+        fi
+        printf '            %-5s %-17s  %-20s %-15s  for %-7s  %b\n' "[${ID[$mac]}]" "$mac" \
+            "$(h=${HOSTS[$mac]:-}; [[ "$h" == "*" ]] && h=; echo "${h:--}")" "${IPS[$mac]:--}" \
+            "$(fmt_duration $(( now - CONNECTED[$mac] )))" "$state"
+    done < <(for mac in "${!CONNECTED[@]}"; do echo "${ID[$mac]} $mac"; done | sort -n)
+}
+
+print_help() {
+    event "${B}commands${N}  (n = device number from the log, or its MAC)"
+    printf '            %-8s %s\n' \
+        "a [n]" "accept (no n: the device waiting longest)" \
+        "d [n]" "decline: disconnect it; if it tries again it is asked about again" \
+        "k n"   "disconnect a device; if it comes back it is asked about again" \
+        "l"     "list the connected devices" \
+        "h"     "this help"
+}
+
+handle_command() {
+    local cmd= arg= extra=
+    read -r cmd arg extra <<< "$1" || true
+    [[ -n "$cmd" ]] || return 0
+    if [[ -n "$extra" ]]; then cmd_error "too many arguments: $1"; return 0; fi
+    case "${cmd,,}" in
+        a|accept)
+            resolve_device "$arg" || return 0
+            accept_device "$RESOLVED" ;;
+        d|decline)
+            resolve_device "$arg" || return 0
+            if [[ "${STATE[$RESOLVED]}" == accepted ]]; then
+                cmd_error "$(label "$RESOLVED") is already accepted: 'k ${ID[$RESOLVED]}' disconnects it"
+                return 0
+            fi
+            decline_device "$RESOLVED" declined ;;
+        k|kick|disconnect)
+            [[ -n "$arg" ]] || { cmd_error "which device? e.g. 'k 3' (l lists them)"; return 0; }
+            resolve_device "$arg" || return 0
+            if [[ "${STATE[$RESOLVED]}" != accepted ]]; then
+                cmd_error "$(label "$RESOLVED") is not accepted: 'd ${ID[$RESOLVED]}' declines it"
+                return 0
+            fi
+            disconnect_device "$RESOLVED" ;;
+        l|ls|list)   list_devices ;;
+        h|help|\?)   print_help ;;
+        *)           cmd_error "unknown command '$cmd'" ;;
+    esac
+}
+
+# Waits POLL_SECS for a command line on the terminal (returns early when one is typed).
+INTERACTIVE=0
+[[ -t 0 ]] && INTERACTIVE=1
+wait_for_command() {
+    local line status
+    if (( ! INTERACTIVE )); then
+        sleep "$POLL_SECS"
+        return 0
+    fi
+    if IFS= read -r -t "$POLL_SECS" line; then
+        handle_command "$line"
+    else
+        status=$?
+        if (( status <= 128 )); then        # end of input (Ctrl+D), not a timeout
+            INTERACTIVE=0
+            event "${Y}! input closed: commands are off, new devices are declined after ${ACCEPT_TIMEOUT}s${N}"
+        fi
+    fi
+}
+
 # ---- main -------------------------------------------------------------------------------
 warn "If you are connected over SSH through $WIFI_IFACE, this drops the session; use Ethernet or the AP itself."
+(( INTERACTIVE )) || warn "Not run from a terminal: nobody can accept devices, so every new device is declined after ${ACCEPT_TIMEOUT}s."
 start_access_point
 print_banner
 
@@ -312,5 +638,5 @@ while true; do
     check_dns_file
     ticks=$(( ticks + 1 ))
     if (( ticks % 5 == 0 )); then check_access_point; fi
-    sleep "$POLL_SECS"
+    wait_for_command
 done

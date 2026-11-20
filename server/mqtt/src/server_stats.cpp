@@ -32,6 +32,11 @@ void ServerStats::reading_received(const std::string& node_id, Clock::time_point
     m_last_reading = at;
 }
 
+void ServerStats::ble_reading_received(const std::string& node_id, Clock::time_point at) {
+    std::lock_guard lock(m_last_mutex);
+    m_last_ble[node_id] = at;
+}
+
 std::string ServerStats::heartbeat_json(std::uint16_t udp_port, Clock::time_point now) const {
     nlohmann::json heartbeat = {
         {"status", "online"},
@@ -42,6 +47,7 @@ std::string ServerStats::heartbeat_json(std::uint16_t udp_port, Clock::time_poin
         {"invalidDatagrams", m_invalid_datagrams.load()},
         {"storageErrors", m_storage_errors.load()},
         {"lastReading", nullptr},
+        {"ble", nlohmann::json::array()},
     };
 
     std::lock_guard lock(m_last_mutex);
@@ -50,6 +56,9 @@ std::string ServerStats::heartbeat_json(std::uint16_t udp_port, Clock::time_poin
             {"nodeId", m_last_node},
             {"secondsAgo", seconds_between(m_last_reading, now)},
         };
+    }
+    for (const auto& [node_id, at] : m_last_ble) {
+        heartbeat["ble"].push_back({{"nodeId", node_id}, {"secondsAgo", seconds_between(at, now)}});
     }
     return heartbeat.dump();
 }

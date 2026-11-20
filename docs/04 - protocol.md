@@ -112,6 +112,35 @@ Reject codes: `invalid_message`, `unsupported_version`, `invalid_payload`,
 Only send correlated responses when the incoming identity can be trusted and
 validated; malformed JSON may not contain enough information to respond.
 
+## BLE fallback
+
+While a node has no WiFi it also broadcasts its latest reading in a non-connectable BLE
+advertisement (no pairing, no connection, no ACK). The codec is
+`nodes/sketch/src/common/ble_reading.h` (`common::ble::encodeReading` / `decodeReading`,
+part of the `common::protocol` target). The ESP32 only supports legacy advertising, so a
+reading must fit in 31 bytes: one Manufacturer Specific Data AD structure with company id
+`0xFFFF` (reserved for testing) and a 27-byte little-endian payload:
+
+| Offset | Size | Field |
+|---|---|---|
+| 0 | 1 | header: `0xC0` magic, `0x08` time synchronized, `0x01` version |
+| 1 | 4 | session nonce; `sessionId` = `boot-<nonce>` |
+| 5 | 4 | `seq` |
+| 9 | 4 | `dateObserved`, Unix epoch seconds |
+| 13 | 2 | temperature, centi-degrees Celsius (signed) |
+| 15 | 2 | relative humidity, fraction x 10000 |
+| 17 | 10 | `nodeId`, ASCII, zero-padded |
+
+Decoding rebuilds a QoS 0 `Reading` with the same `id`/`refDevice` URNs the node would
+have sent. Location is not carried: the server copies it from the node's previous stored
+reading (or uses 0, 0). The reading is also kept in the node's spools and replayed over
+UDP/MQTT once WiFi returns.
+
+The server scans when `[ble] enabled = true` (`server/ble`, SimpleBLE). Each advertisement is
+received many times, so `AlertServer::handleBleReading` ignores any reading whose identity is
+already stored; otherwise it runs the same alert logic, persistence and MQTT alert publishing
+as a UDP reading. Nothing is sent back over BLE. The UDP path is unchanged.
+
 ## Delivery Contract
 
 QoS 0 means send once, without an ACK. QoS 1 means at-least-once delivery:
