@@ -11,6 +11,7 @@ TEST(ServerConfig, LoadsSampleIniIntoRuntimeSettings) {
     const ServerConfig config = load_server_config("config/tests/alert_server_test.ini");
 
     EXPECT_EQ(config.database_path, "test-readings.sqlite3");
+    EXPECT_EQ(config.max_comparison_gap, std::chrono::seconds(5));
     EXPECT_EQ(config.udp.bind_address, "127.0.0.1");
     EXPECT_EQ(config.udp.port, 18080);
     EXPECT_TRUE(config.mqtt_enabled);
@@ -28,6 +29,7 @@ std::string write_ini(const std::string& name, const std::string& ble_section) {
     const std::string path = testing::TempDir() + name;
     std::ofstream out(path);
     out << "[database]\npath = test.sqlite3\n"
+           "[alerts]\nmax_comparison_gap_seconds = 5\n"
            "[udp]\nbind_address = 127.0.0.1\nport = 18080\n"
            "[mqtt]\nenabled = false\nhost = h\nport = 1883\nclient_id = c\ntopic = t\n"
            "heartbeat_interval_seconds = 5\nkeepalive_seconds = 10\n"

@@ -25,43 +25,53 @@ legend right
   GoogleTest builds one test executable per module.
 endlegend
 
-' ---- external to server/ -------------------------------------------------------------------
+' ---- shared protocol and external systems --------------------------------------------------
 class "ESP32 node" as ESP32 <<external>> {
   UDP client, JSON datagrams
 }
 class "MQTT broker\n(Command Centre)" as BROKER <<external>> {
   cc.comcs.lan:1883
 }
-class "common::protocol" as PROTOCOL <<external>> {
+class "common::protocol\n(shared module)" as PROTOCOL <<external>> {
+  Reading: version, nodeId, sessionId, seq, qos
+  payload: NGSI-LD WeatherObserved
+  temperature, relativeHumidity (0..1)
+  dateObserved, location, refDevice
+  timeSynchronized (optional)
+  --
   Message = Reading | Ack | Reject
   --
   decode(json) : Message
   encode(Message) : json
 }
+class "Power Automate\n(webhook)" as POWER_AUTOMATE <<external>> {
+  email notification endpoint
+}
 
 ' ---- daemon ---------------------------------------------------------------------------------
 package "daemon  (alert_server executable)" as DAEMON {
   class "alert_server (main)" as MAIN <<block>> {
-    values
-    udp_port = 8080
-    mqtt = on
-    --
+    load config, create store / logic / server
     receive loop: server.receive()
-    signal watcher thread
   }
   class "AlertServer" as SERVER <<block>> {
     receive() : ReceivedMessage
     send(Message, UdpEndpoint)
-  }
-  class "ServerStats" as STATS <<block>> {
-    values
-    readings, invalidDatagrams, storageErrors
-    lastReading
     --
-    reading_received(node_id)
-    invalid_datagram()
-    storage_error()
-    heartbeat_json(port) : string
+    decode -> process -> save
+    publish alert -> ACK for QoS 1
+  }
+}
+
+' ---- configuration --------------------------------------------------------------------------
+package "config" as CONFIG {
+  class "ServerConfig" as SETTINGS <<block>> {
+    values
+    database path, UDP endpoint
+    MQTT settings (optional)
+    email webhook / recipient settings
+    --
+    load_server_config(path)
   }
 }
 
@@ -74,7 +84,11 @@ package "application  (alert_logic)" as APP {
     temperature range [0, 50] °C
     humidity range [20, 80] %
     --
-    processReading(Reading)
+    processReading(Reading) : ComparisonResult?
+    compare with last stored reading
+  }
+  interface "AlertNotifier" as NOTIFIER {
+    sendAlert(AlertData) : bool
   }
 }
 
@@ -88,6 +102,17 @@ package "persistency" as PERS {
     find(Identity) : Reading?
     getLastReading() : Reading?
   }
+}
+
+' ---- communication --------------------------------------------------------------------------
+package "communication" as COMM {
+  class "EmailNotifier" as EMAIL <<block>> {
+    Power Automate webhook
+    recipient email
+    --
+    sendAlert(AlertData) : bool
+  }
+  EMAIL .up.|> NOTIFIER
 }
 
 ' ---- udp ------------------------------------------------------------------------------------
@@ -107,13 +132,30 @@ package "udp  (udp_socket)" as UDP {
 
 ' ---- mqtt -----------------------------------------------------------------------------------
 package "mqtt  (mqtt_status)" as MQTT {
-  class "StatusPublisher" as PUBLISHER <<block>> {
+  class "MqttPublisher" as MQTTPUB <<block>> {
+    connect / reconnect
+    publish(topic, payload, qos, retained)
+  }
+  class "AlertPublisher" as ALERTPUB <<block>> {
+    publish(Reading, ComparisonResult)
+    MQTT alert topic, QoS 1
+  }
+  class "StatusPublisher" as STATUS <<block>> {
     values
-    topic = comcs/cell1/alert-server
-    interval = 5 s
+    heartbeat interval from config
     --
-    own thread: connect / reconnect
-    publish status, heartbeat
+    own thread
+    publish heartbeat when connected
+  }
+  class "ServerStats" as STATS <<block>> {
+    readings, invalidDatagrams, storageErrors
+    lastReading
+    --
+    reading_received(node_id)
+    invalid_datagram()
+    storage_error()
+    heartbeat_json(port) : string
+    update hooks not wired to receive loop
   }
 }
 
@@ -125,6 +167,9 @@ package "vendor" as VENDOR {
   class "mosquitto" as MOSQUITTO <<library>> {
     libmosquitto_static
   }
+  class "curl CLI" as CURL <<external>> {
+    invoked by EmailNotifier for HTTP POST
+  }
   class "spdlog" as SPDLOG <<library>> {
     console + logs/alert_server.log
   }
@@ -134,28 +179,35 @@ package "vendor" as VENDOR {
 }
 
 ' ---- parts (who owns whom) ------------------------------------------------------------------
-MAIN *-- "1" STORE
-MAIN *-- "1" LOGIC
-MAIN *-- "0..1" PUBLISHER : not with --no-mqtt
+MAIN --> SETTINGS : load config
+MAIN --> STORE : creates
+MAIN --> LOGIC : creates
+MAIN *-- "1" SERVER
 
 ' ---- calls (parts that the owner also calls) ------------------------------------------------
-MAIN *--> "1" SERVER : receive()
-MAIN *--> "1" STATS : reading_received()\ninvalid_datagram()\nstorage_error()
 SERVER *--> "1" SOCKET : recv() / send(Ack)
-SERVER --> LOGIC : 1. processReading(reading)
-SERVER --> STORE : 2. save(reading)
+SERVER --> LOGIC : processReading(reading)
+SERVER --> STORE : save(reading)
 LOGIC --> STORE : getLastReading()
-PUBLISHER --> STATS : heartbeat_json()\n(callback given by main)
+SERVER *--> "0..1" MQTTPUB : when MQTT is enabled
+SERVER *--> "0..1" ALERTPUB : when MQTT is enabled
+SERVER *--> "0..1" STATUS : when MQTT is enabled
+STATUS *-- "1" STATS
+STATUS --> MQTTPUB : publish heartbeat
+ALERTPUB --> MQTTPUB : publish alert
+LOGIC ..> NOTIFIER : optional injection\n(not wired by main currently)
+EMAIL --> CURL : invoke HTTP request
+EMAIL -[#red]-> POWER_AUTOMATE : HTTPS webhook
 
 ' ---- uses -----------------------------------------------------------------------------------
 SERVER ..> PROTOCOL : decode() / encode()
 STORE ..> SQLITE
-PUBLISHER ..> MOSQUITTO
+MQTTPUB ..> MOSQUITTO
 MAIN ..> SPDLOG
 
 ' ---- network flows --------------------------------------------------------------------------
-ESP32 -[#red]-> SOCKET : UDP :8080\nReading (JSON)
-SOCKET -[#red]-> ESP32 : Ack (QoS 1)
-PUBLISHER -[#red]-> BROKER : MQTT\n<topic>/status (retained, LWT)\n<topic>/heartbeat
+ESP32 -[#red]-> SOCKET : UDP :8080\nReading (JSON, QoS 0/1)
+SOCKET -[#red]-> ESP32 : Ack / Reject
+MQTTPUB -[#red]-> BROKER : MQTT\nalerts + heartbeat
 
 @enduml

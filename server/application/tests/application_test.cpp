@@ -1,6 +1,7 @@
 #include "application.h"
 #include "reading_store.h"
 #include <gtest/gtest.h>
+#include <thread>
 
 namespace {
 
@@ -131,6 +132,19 @@ TEST_F(AlertLogicTest, AllowsNormalReadings) {
     EXPECT_FALSE(result->exceeds_humidity_threshold);
     EXPECT_FALSE(result->out_of_temp_range);
     EXPECT_FALSE(result->out_of_humidity_range);
+}
+
+TEST(AlertLogicValidityTest, SkipsComparisonWhenReadingGapExceedsConfiguredMaximum) {
+    ReadingStore store{":memory:"};
+    AlertLogic logic{store, nullptr, std::chrono::milliseconds(1)};
+    auto first = makeReading(identity1(), 23.0, 0.55);
+    auto second = makeReading(identity2(), 26.0, 0.55);
+
+    EXPECT_FALSE(logic.processReading(first).has_value());
+    store.save(first);
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
+    EXPECT_FALSE(logic.processReading(second).has_value());
 }
 
 }  // namespace

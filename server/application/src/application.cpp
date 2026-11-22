@@ -4,6 +4,7 @@
 #include <cmath>
 #include <sstream>
 #include <iomanip>
+#include <stdexcept>
 
 namespace {
 // The protocol carries relativeHumidity as an NGSI-LD fraction (0..1);
@@ -11,19 +12,35 @@ namespace {
 double toPercent(double fraction) { return fraction * 100.0; }
 }  // namespace
 
-AlertLogic::AlertLogic(ReadingStore& store, AlertNotifierPtr notifier)
-    : m_store(store), m_notifier(notifier), m_last_reading_time(std::chrono::system_clock::now()) {}
+AlertLogic::AlertLogic(ReadingStore& store,
+                       AlertNotifierPtr notifier,
+                       std::chrono::milliseconds max_comparison_gap)
+    : m_store(store),
+      m_notifier(notifier),
+      m_last_reading_time(std::chrono::steady_clock::now()),
+      m_max_comparison_gap(max_comparison_gap) {
+    if (m_max_comparison_gap < std::chrono::milliseconds::zero()) {
+        throw std::invalid_argument("maximum comparison gap must not be negative");
+    }
+}
 
 std::optional<AlertLogic::ComparisonResult> AlertLogic::processReading(
     const common::protocol::Reading& reading) {
-    const auto now = std::chrono::system_clock::now();
+    const auto now = std::chrono::steady_clock::now();
+    const auto elapsed = now - m_last_reading_time;
 
     std::optional<ComparisonResult> comparison;
     logReading(reading);
 
     if (auto last = m_store.getLastReadingBefore(reading.identity)) {
-        comparison = compareWithLast(reading, *last);
-        logComparison(*comparison, reading, *last);
+        if (elapsed <= m_max_comparison_gap) {
+            comparison = compareWithLast(
+                reading, *last, std::chrono::duration_cast<std::chrono::milliseconds>(elapsed));
+            logComparison(*comparison, reading, *last);
+        } else {
+            spdlog::info("Skipping comparison: reading gap exceeds configured maximum of {} ms",
+                         m_max_comparison_gap.count());
+        }
     } else {
         spdlog::info("No prior reading from this ESP, no comparison");
     }
@@ -34,7 +51,8 @@ std::optional<AlertLogic::ComparisonResult> AlertLogic::processReading(
 
 AlertLogic::ComparisonResult AlertLogic::compareWithLast(
     const common::protocol::Reading& current,
-    const common::protocol::Reading& last) const {
+    const common::protocol::Reading& last,
+    std::chrono::milliseconds time_diff) const {
     
     const auto& cp = current.payload;
     const auto& lp = last.payload;
@@ -43,10 +61,6 @@ AlertLogic::ComparisonResult AlertLogic::compareWithLast(
     
     double temp_diff = std::abs(cp.temperature - lp.temperature);
     double humidity_diff = std::abs(cur_hum - last_hum);
-    
-    auto time_diff = std::chrono::duration_cast<std::chrono::milliseconds>(
-        std::chrono::system_clock::now() - m_last_reading_time
-    );
     
     // Check ranges
     bool current_temp_valid = cp.temperature >= TEMPERATURE_MIN && cp.temperature <= TEMPERATURE_MAX;
