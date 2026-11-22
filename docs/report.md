@@ -6,18 +6,19 @@
   - [Servidor](#servidor)
     - [Envio de emails](#envio-de-emails)
   - [ESPs](#esps)
-  - [Centro de comandos](#centro-de-comandos)
 - [Instruções de build](#instruções-de-build)
-  - [Setup ESP](#setup-esp)
+  - [Setup centro de comandos](#setup-centro-de-comandos)
   - [Setup servidor](#setup-servidor)
-  - [Setup NodeRed](#setup-nodered)
+  - [Setup ESP](#setup-esp)
 
 ## Contexto
 
 O trabalho consiste em desenvolver um sistema de monitoramento de temperatura e humidade a usar ESP32s. 
 O objetivo é recolher dados de sensores, transmiti-los para um servidor através de UDP e processá-los para enviar alertas por MQTT para um centro de comandos NodeRed. O centro de comando também recebe dados directamente das nodes para grafar os dados dos sensores ao longo do tempo.
 
-<img src="./images/system.png" alt="" style="width:400px;"/>
+<img src="./images/system_v2.png" alt="" style="width:auto;"/>
+
+<br><br>
 
 ### Extras
 
@@ -26,6 +27,7 @@ A nossa equipa decidiu também implementar certos extras, nomeadamente:
 - Componentes extra na parte electrónica para visualização de estado
 - Visualização de estado de cada ESP no centro de comandos
 - Envio de e-mails de aviso a cada warning
+- Servidor corss platform (Linux e Windows)
 
 ## Design
 
@@ -128,28 +130,32 @@ As esquemáticas do circuito idealizadas pela equipa são as seguintes:
 
 Cada leitura é enviada por UDP a cada segundo (configurável) para o servidor de alertas e MQTT para o centro de comandos. Se um envio falhar, o ESP guarda a mensagem numa fila própria em SPIFFS e tenta reenviá-la quando a ligação voltar. 
 
-### Centro de comandos
+Os dados são também enviados por BLE para o servidor, que está passivamente à escuta de envios por BLE além de UDP.
 
 ## Instruções de build
 
 O projecto foi feito para correr com um AP, MQTT broker local e servidor a correr num raspberry PI, o setup local pode ser feito da seguinte maneira:
 
-### Setup ESP
+### Setup centro de comandos
 
-O ESP deve ser montado da mesma maneira indicada no capitulo de design, mas os extras podem ser ignorados ao configurar o ESP com null nos campos apropriados.
+O command centre deve ser a primeira coisa a ser começada.
+O setup está contido dentro de uma docker image, para o começar, usa-se o comando:
 
-As nossas configurações estão na pasta `nodes/sketch/src/configs`, num setup local devem ser trocados o ssid e password do WIFI, o IP do servidor, o host do mqtt broker e tudo o resto que se ache relevante.
-
-A configuração a usar é definida como uma macro no ficheiro `nodes/sketch/src/config.h`, mas como tal pode também ser passada como argumento ao compilador, que é o que fazemos no nosso `nodes/Makefile`, que usa a arduino-cli para automatizar o processo de flashing, mas o arduino IDE também serve.
-
-A este ponto o serial monitor deverá mostrar os seguintes logs:
 ```
-les logs
+docker compose up -d --build
 ```
+
+![alt text](./images/docker_logs.png)
+
+Node-RED: http://192.168.60.1:1880
+
+Dashboard: http://192.168.60.1:1880/dashboard
+
+MQTT: 192.168.60.1:1883
 
 ### Setup servidor
 
-Para baixar as dependencias do servidos, caso tenha feito `git clone`, é baixar os sub módulos git.
+Para baixar as dependencias do servidos, caso tenha feito `git clone`, é preciso baixar os sub módulos git.
 
 ```sh
 git submodule update --init --recursive
@@ -175,8 +181,16 @@ O servidor precisa de um ficheiro de configuração para correr, nesse ficheiro 
 O nosso config está no caminho: `server/alert_server.ini`
 
 Se tudo correr bem devemos ver algo como:
-```
-logs
-```
 
-### Setup NodeRed
+![alt text](images/server_logs.png)
+
+### Setup ESP
+
+O ESP deve ser montado da mesma maneira indicada no capitulo de design, mas os extras podem ser ignorados ao configurar o ESP com null nos campos apropriados.
+
+As nossas configurações estão na pasta `nodes/sketch/src/configs`, num setup local devem ser trocados o ssid e password do WIFI, o IP do servidor, o host do mqtt broker e tudo o resto que se ache relevante.
+
+A configuração a usar é definida como uma macro no ficheiro `nodes/sketch/src/config.h`, mas como tal pode também ser passada como argumento ao compilador, que é o que fazemos no nosso `nodes/Makefile`, que usa a arduino-cli para automatizar o processo de flashing, mas o arduino IDE também serve.
+
+A este ponto o serial monitor deverá mostrar os seguintes logs:
+![alt text](images/monitor_logs.png)
