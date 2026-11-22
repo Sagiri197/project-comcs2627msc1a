@@ -10,6 +10,11 @@
   - [Setup centro de comandos](#setup-centro-de-comandos)
   - [Setup servidor](#setup-servidor)
   - [Setup ESP](#setup-esp)
+    - [Alertas no command centre](#alertas-no-command-centre)
+    - [Cálculos estatísticos no command centre](#cálculos-estatísticos-no-command-centre)
+    - [Histórico no command centre](#histórico-no-command-centre)
+    - [Ligações no command centre](#ligações-no-command-centre)
+    - [BLE no command centre](#ble-no-command-centre)
 
 ## Contexto
 
@@ -201,3 +206,18 @@ Nestes ficheiros podem ser configuradas as definições para cada Node, como o S
 
 A este ponto o serial monitor deverá mostrar os seguintes logs:
 ![alt text](images/monitor_logs.png)
+
+#### Alertas no command centre
+![alt text](image.png)
+
+#### Cálculos estatísticos no command centre
+![alt text](image-1.png)
+
+#### Histórico no command centre
+![alt text](image-2.png)
+
+#### Ligações no command centre
+![alt text](image-3.png)
+
+#### BLE no command centre
+![alt text](image-4.png)
