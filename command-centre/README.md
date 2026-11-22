@@ -74,6 +74,12 @@ resolves within 2 s.
 | Editor    | http://localhost:1880                          |
 | Dashboard | http://localhost:1880/dashboard                |
 | Broker    | `cc.comcs.lan:1883` (no authentication)        |
+|-----------|------------------------------------------------|
+| Editor (server wifi)| http://192.168.50.1:1880             |
+| Dashboard | http://192.168.50.1:1880/dashboard             |
+|-----------|------------------------------------------------|
+| Editor (server eth)| http://192.168.60.1:1880              |
+| Dashboard (server eth)| http://192.168.60.1:1880/dashboard    |
 
 Stop with `docker compose down`. Retained status messages and QoS 1 sessions are stored in
 the `mosquitto-data` volume, so they survive restarts. Node-RED takes ~30 s to start; the
