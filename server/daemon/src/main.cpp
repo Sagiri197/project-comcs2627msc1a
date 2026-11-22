@@ -59,7 +59,7 @@ int main(int argc, char** argv) {
         const ServerConfig config = load_server_config(parse_config_path(argc, argv));
 
         ReadingStore store(config.database_path);
-        AlertLogic logic(store);
+        AlertLogic logic(store, nullptr, config.max_comparison_gap);
         
         // Create AlertServer with optional MQTT support
         std::optional<ServerConfig::MqttSettings> mqtt_config;

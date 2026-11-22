@@ -27,6 +27,12 @@ ServerConfig load_server_config(const std::string& path) {
         throw std::invalid_argument("[database] path must not be empty");
     }
 
+    const int max_comparison_gap = reader.get_int("alerts", "max_comparison_gap_seconds");
+    if (max_comparison_gap < 1) {
+        throw std::invalid_argument("[alerts] max_comparison_gap_seconds must be at least 1");
+    }
+    config.max_comparison_gap = std::chrono::seconds(max_comparison_gap);
+
     config.udp.bind_address = reader.get("udp", "bind_address");
     if (config.udp.bind_address.empty()) {
         throw std::invalid_argument("[udp] bind_address must not be empty");

@@ -26,6 +26,7 @@ struct ServerConfig {
     };
 
     std::string database_path;
+    std::chrono::milliseconds max_comparison_gap;
     UdpSettings udp;
     bool mqtt_enabled;
     MqttSettings mqtt;

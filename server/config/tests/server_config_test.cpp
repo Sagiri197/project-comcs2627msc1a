@@ -8,6 +8,7 @@ TEST(ServerConfig, LoadsSampleIniIntoRuntimeSettings) {
     const ServerConfig config = load_server_config("config/tests/alert_server_test.ini");
 
     EXPECT_EQ(config.database_path, "test-readings.sqlite3");
+    EXPECT_EQ(config.max_comparison_gap, std::chrono::seconds(5));
     EXPECT_EQ(config.udp.bind_address, "127.0.0.1");
     EXPECT_EQ(config.udp.port, 18080);
     EXPECT_TRUE(config.mqtt_enabled);
