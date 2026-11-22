@@ -10,11 +10,6 @@
   - [Setup centro de comandos](#setup-centro-de-comandos)
   - [Setup servidor](#setup-servidor)
   - [Setup ESP](#setup-esp)
-    - [Alertas no command centre](#alertas-no-command-centre)
-    - [Cálculos estatísticos no command centre](#cálculos-estatísticos-no-command-centre)
-    - [Histórico no command centre](#histórico-no-command-centre)
-    - [Ligações no command centre](#ligações-no-command-centre)
-    - [BLE no command centre](#ble-no-command-centre)
 
 ## Contexto
 
@@ -191,6 +186,9 @@ Output esperado:
 
 ![alt text](images/server_logs.png)
 
+#### Email <!-- omit in toc -->
+![alt text](images/email.png)
+
 ### Setup ESP
 
 Disponibilizamos um Makefile para automatizar o processo de compilação e upload.
@@ -207,17 +205,17 @@ Nestes ficheiros podem ser configuradas as definições para cada Node, como o S
 A este ponto o serial monitor deverá mostrar os seguintes logs:
 ![alt text](images/monitor_logs.png)
 
-#### Alertas no command centre
-![alt text](image.png)
+#### Alertas no command centre <!-- omit in toc -->
+![alt text](images/image.png)
 
-#### Cálculos estatísticos no command centre
-![alt text](image-1.png)
+#### Cálculos estatísticos no command centre <!-- omit in toc -->
+![alt text](images/image-1.png)
 
-#### Histórico no command centre
-![alt text](image-2.png)
+#### Histórico no command centre <!-- omit in toc -->
+![alt text](images/image-2.png)
 
-#### Ligações no command centre
-![alt text](image-3.png)
+#### Ligações no command centre <!-- omit in toc -->
+![alt text](images/image-3.png)
 
-#### BLE no command centre
-![alt text](image-4.png)
+#### BLE no command centre <!-- omit in toc -->
+![alt text](images/image-4.png)
