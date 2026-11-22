@@ -22,26 +22,27 @@ O objetivo é recolher dados de sensores, transmiti-los para um servidor atravé
 
 ### Extras
 
-A nossa equipa decidiu também implementar certos extras, nomeadamente:
-- Redundância, através de BLE, o protocolo de redundância será explicado depois
+A nossa equipa decidiu também implementar os seguintes extras:
+- Redundância da conexão, os nodes conectam-se ao Alert Server tanto por UDP como BLE
 - Componentes extra na parte electrónica para visualização de estado
 - Visualização de estado de cada ESP no centro de comandos
 - Envio de e-mails de aviso a cada warning
-- Servidor corss platform (Linux e Windows)
+- Servidor cross-platform (Linux e Windows)
 
 ## Design
 
 ### Servidor 
 
-O servidor foi escrito em C++ para podermos mais facilmente criar testes unitários e ter à nossa disposição mais livrarias, assim como melhor organização do código ao ter acesso a classes.
+O servidor foi escrito em C++. Nesta linguagem temos acesso a bibliotecas robustas que utilizamos para funcionalidades como logging, BLE, testes unitários, entre outros. Também concluimos que é uma linguagem mais adequada para um sistema deste género, porque ao contrário de C, permite-nos aplicar desenvolvimento orientado a objetos. 
 
-O servidor é platform independent e tem implementações Posix e Windows onde necessário.
+O servidor é suportado tanto em Windows como em Linux.
 
 #### Serviço UDP <!-- omit in toc -->
 
 ##### Protocolo <!-- omit in toc -->
 
-O protocolo é uma livraria partilhada entre os ESPs e o servidor, o formato é este
+Foi definido o nosso próprio protocolo de comunicação, partilhado entre os Nodes e o servidor. 
+Segue o seguinte formato, baseado em Smart Data:
 
 ```json
 {
@@ -90,7 +91,7 @@ O servidor usa os dados persistidos para fazer comparações à medida que leitu
 
 ##### Logging <!-- omit in toc -->
 
-O servidor utiliza spdlog para registar informação tanto na consola como no ficheiro `logs/alert_server.log`. 
+O servidor utiliza a biblioteca spdlog para registar informação tanto na consola como no ficheiro `logs/alert_server.log`. 
 
 Os registos incluem:
 - Recepção de leituras
@@ -138,7 +139,7 @@ O projecto foi feito para correr com um AP, MQTT broker local e servidor a corre
 
 ### Setup centro de comandos
 
-O command centre deve ser a primeira coisa a ser começada.
+O command centre deve ser a primeira coisa a correr.
 O setup está contido dentro de uma docker image, para o começar, usa-se o comando:
 
 ```
@@ -155,42 +156,48 @@ MQTT: 192.168.60.1:1883
 
 ### Setup servidor
 
-Para baixar as dependencias do servidos, caso tenha feito `git clone`, é preciso baixar os sub módulos git.
+Para inicializar o repositório:
 
 ```sh
+git clone https://github.com/Sagiri197/project-comcs2627msc1a.git
 git submodule update --init --recursive
 ```
 
-O servidor foi feito em C++ com CMake, para tal é preciso ter o CMake instalado, um compilador de C++ (recomendado clang ou mingw em windows) e um build system (recomendado ninja). A build é feita normalmente:
+Para compilar o Alert Server, é necessário o CMake e um compilador de C++.
 
 ```sh
+# build com testes
 cmake -S server -B server/build -DBUILD_TESTING=ON
+
+#build sem testes
+cmake -S server -B server/build
+
+# iniciar compilação
 cmake --build server/build -j2
-```
 
-`-DBUILD_TESTING=ON` indica ao CMake para incluir os ficheiros de teste, os testes (unit e e2e) podem ser corridos com ctest:
-```sh
+# correr testes
 ctest --test-dir server/build
-```
 
-O servidor precisa de um ficheiro de configuração para correr, nesse ficheiro será preciso também definir os endpoints desejados para o MQTT broker e afins.
-```sh
+# correr servidor 
 ./server/build/bin/alert_server --config server/alert_server.ini
 ```
 
-O nosso config está no caminho: `server/alert_server.ini`
-
-Se tudo correr bem devemos ver algo como:
+Output esperado:
 
 ![alt text](images/server_logs.png)
 
 ### Setup ESP
 
-O ESP deve ser montado da mesma maneira indicada no capitulo de design, mas os extras podem ser ignorados ao configurar o ESP com null nos campos apropriados.
+Disponibilizamos um Makefile para automatizar o processo de compilação e upload.
 
-As nossas configurações estão na pasta `nodes/sketch/src/configs`, num setup local devem ser trocados o ssid e password do WIFI, o IP do servidor, o host do mqtt broker e tudo o resto que se ache relevante.
+Exemplo, para NODE_PROFILE == 1 (ver nodes\sketch\src\config.h): 
 
-A configuração a usar é definida como uma macro no ficheiro `nodes/sketch/src/config.h`, mas como tal pode também ser passada como argumento ao compilador, que é o que fazemos no nosso `nodes/Makefile`, que usa a arduino-cli para automatizar o processo de flashing, mas o arduino IDE também serve.
+```sh
+make -C nodes flash-monitor NODE=1
+```
+
+As configurações estão na pasta `nodes/sketch/src/configs`.
+Nestes ficheiros podem ser configuradas as definições para cada Node, como o SSID, password, MQTT Server, etc.
 
 A este ponto o serial monitor deverá mostrar os seguintes logs:
 ![alt text](images/monitor_logs.png)
