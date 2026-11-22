@@ -3,6 +3,7 @@
 #include <atomic>
 #include <chrono>
 #include <cstdint>
+#include <map>
 #include <mutex>
 #include <string>
 
@@ -16,6 +17,12 @@ public:
     /** @brief Records a received reading and updates the most-recent reading details. */
     void reading_received(const std::string& node_id, Clock::time_point at = Clock::now());
 
+    /**
+     * @brief Records a reading that arrived over BLE (the node lost WiFi). Call it in addition
+     *        to reading_received(); the heartbeat then lists the node under `ble`.
+     */
+    void ble_reading_received(const std::string& node_id, Clock::time_point at = Clock::now());
+
     /** @brief Increments the invalid-datagram counter. */
     void invalid_datagram() noexcept { ++m_invalid_datagrams; }
 
@@ -26,7 +33,9 @@ public:
      * @brief Serializes the server heartbeat as JSON.
      *
      * The payload includes status, UTC issue time, uptime, UDP port, counters, and the most
-     * recent reading. `lastReading` is null until a reading has been recorded.
+     * recent reading. `lastReading` is null until a reading has been recorded. `ble` lists
+     * every node heard over BLE, `{"nodeId", "secondsAgo"}` since its latest BLE reading
+     * (empty until one arrives), so the Command Centre can show which nodes use BLE.
      * @param udp_port UDP port served by the daemon.
      * @param now Time used for the issue timestamp, uptime, and reading age.
      * @return Compact JSON suitable for publishing on the heartbeat topic.
@@ -42,4 +51,5 @@ private:
     mutable std::mutex m_last_mutex;
     std::string m_last_node;
     Clock::time_point m_last_reading{};
+    std::map<std::string, Clock::time_point> m_last_ble;   // node_id -> latest BLE reading
 };

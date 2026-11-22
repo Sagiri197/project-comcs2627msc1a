@@ -1,6 +1,6 @@
 add_library(alert_server_core src/alert_server.cpp)
 target_include_directories(alert_server_core PUBLIC include ../mqtt/include)
-target_link_libraries(alert_server_core PUBLIC udp_socket common::protocol persistency alert_logic mqtt_publishers
+target_link_libraries(alert_server_core PUBLIC udp_socket common::protocol persistency alert_logic mqtt_publishers ble_scanner
     PRIVATE nlohmann_json::nlohmann_json)
 
 add_executable(
@@ -14,6 +14,7 @@ target_link_libraries(alert_server PRIVATE
     spdlog::spdlog
     alert_server_core
     mqtt_publishers
+    common::protocol
 )
 
 if(BUILD_TESTING)

@@ -110,7 +110,7 @@ std::optional<common::protocol::Reading> ReadingStore::find(
         "FROM readings WHERE node_id=?1 AND session_id=?2 AND seq=?3;");
     
     bind_identity(m_database, statement.get(), identity);
-    
+
     const int result = sqlite3_step(statement.get());
     if (result == SQLITE_ROW) {
         const double temperature = sqlite3_column_double(statement.get(), 0);
@@ -142,7 +142,7 @@ std::optional<common::protocol::Reading> ReadingStore::getLastReading() const {
     if (result != SQLITE_ROW) {
         return std::nullopt;  // No readings yet
     }
-    
+
     const std::string node_id = reinterpret_cast<const char*>(sqlite3_column_text(statement.get(), 0));
     const std::string session_id = reinterpret_cast<const char*>(sqlite3_column_text(statement.get(), 1));
     const std::uint32_t seq = sqlite3_column_int(statement.get(), 2);
@@ -150,7 +150,7 @@ std::optional<common::protocol::Reading> ReadingStore::getLastReading() const {
     const double humidity = sqlite3_column_double(statement.get(), 4);
     const double longitude = sqlite3_column_double(statement.get(), 5);
     const double latitude = sqlite3_column_double(statement.get(), 6);
-    
+
     common::protocol::Identity identity{node_id, session_id, seq};
     common::protocol::WeatherObserved payload{
         "urn:ngsi-ld:WeatherObserved:" + node_id + ":" + session_id + ":" + std::to_string(seq),
@@ -160,6 +160,46 @@ std::optional<common::protocol::Reading> ReadingStore::getLastReading() const {
         temperature,
         humidity
     };
-    
+
+    return common::protocol::Reading{identity, common::protocol::Qos::BestEffort, payload, true};
+}
+std::optional<common::protocol::Reading> ReadingStore::getLastReadingBefore(
+    const common::protocol::Identity& before) const {
+    auto statement = prepare(m_database,
+        "SELECT node_id, session_id, seq, temperature, relative_humidity, longitude, latitude "
+        "FROM readings "
+        "WHERE node_id=?1 AND NOT (session_id=?2 AND seq>=?3) "
+        "ORDER BY CASE WHEN session_id=?2 THEN 0 ELSE 1 END, seq DESC LIMIT 1;");
+
+    if (sqlite3_bind_text(statement.get(), 1, before.node_id.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK ||
+        sqlite3_bind_text(statement.get(), 2, before.session_id.c_str(), -1, SQLITE_TRANSIENT) != SQLITE_OK ||
+        sqlite3_bind_int64(statement.get(), 3, before.seq) != SQLITE_OK) {
+        database_error(m_database, "Bind reading identity");
+    }
+
+    const int result = sqlite3_step(statement.get());
+    if (result != SQLITE_ROW) {
+        if (result != SQLITE_DONE) database_error(m_database, "Find previous reading");
+        return std::nullopt;
+    }
+
+    const std::string node_id = reinterpret_cast<const char*>(sqlite3_column_text(statement.get(), 0));
+    const std::string session_id = reinterpret_cast<const char*>(sqlite3_column_text(statement.get(), 1));
+    const std::uint32_t seq = sqlite3_column_int(statement.get(), 2);
+    const double temperature = sqlite3_column_double(statement.get(), 3);
+    const double humidity = sqlite3_column_double(statement.get(), 4);
+    const double longitude = sqlite3_column_double(statement.get(), 5);
+    const double latitude = sqlite3_column_double(statement.get(), 6);
+
+    common::protocol::Identity identity{node_id, session_id, seq};
+    common::protocol::WeatherObserved payload{
+        "urn:ngsi-ld:WeatherObserved:" + node_id + ":" + session_id + ":" + std::to_string(seq),
+        "2026-11-07T00:00:00Z",
+        {longitude, latitude},
+        "urn:ngsi-ld:Device:" + node_id,
+        temperature,
+        humidity
+    };
+
     return common::protocol::Reading{identity, common::protocol::Qos::BestEffort, payload, true};
 }

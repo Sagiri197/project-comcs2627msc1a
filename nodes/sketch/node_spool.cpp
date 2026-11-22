@@ -5,7 +5,7 @@
 #include <SPIFFS.h>
 #include <esp_rom_crc.h>
 
-#include "../../common/protocol.h"
+#include "src/common/protocol.h"
 
 #include <cstddef>
 

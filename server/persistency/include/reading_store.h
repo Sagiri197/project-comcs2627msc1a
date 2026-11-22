@@ -43,6 +43,13 @@ public:
     /** @brief Returns the most recently stored reading, or `std::nullopt` if empty. */
     std::optional<common::protocol::Reading> getLastReading() const;
 
+    /**
+     * @brief Returns a prior stored reading from the same node, preferring an
+     *        earlier sequence in the current session.
+     */
+    std::optional<common::protocol::Reading> getLastReadingBefore(
+        const common::protocol::Identity& identity) const;
+
 private:
     sqlite3* m_database = nullptr;
 };

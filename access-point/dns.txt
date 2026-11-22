@@ -1,8 +1,10 @@
 # DNS names for the Pi's access point (access-point/linux/access-point.sh), reloaded on save.
 # hostname ipAddress
-# Add the Command Centre once it has joined, with the address shown in the device log, e.g.
-# cc.comcs.lan 192.168.50.87
+# The Command Centre (Docker: MQTT broker + Node-RED) runs on this Pi, so cc.comcs.lan is the
+# Pi itself. If it runs on another machine instead, use that machine's address from the
+# device log, e.g. cc.comcs.lan 192.168.50.87
 as.comcs.lan 192.168.50.1
+cc.comcs.lan 192.168.50.1
 pool.ntp.org 192.168.50.1
 time.google.com 192.168.50.1
 time.nist.gov 192.168.50.1

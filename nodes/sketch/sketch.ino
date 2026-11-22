@@ -1,37 +1,121 @@
 #include <WiFi.h>
 #include <esp_system.h>
 
-#include "../../common/protocol.h"
-#include "../config.h"
+#include "src/common/ble_reading.h"
+#include "src/common/protocol.h"
+#include "src/config.h"
 
-#include "node_dht.h"
-#include "node_mqtt.h"
+#include "src/communication/node_ble.h"
+#include "src/communication/node_mqtt.h"
+#include "src/communication/node_udp.h"
+#include "src/hardware/node_dht.h"
+#include "src/hardware/node_display.h"
+#include "src/hardware/node_status_led.h"
 #include "node_spool.h"
-#include "node_udp.h"
 
-#include <string>
 #include <ctime>
+#include <string>
 #include <variant>
 
 using namespace common::protocol;
 
+// Declared before any function: the Arduino builder inserts auto-generated prototypes
+// above the first function definition.
+enum class UdpResult { Delivered, Rejected, Failed };
+
 std::string sessionId;
 uint32_t sequenceNumber = 0;
 bool timeSynchronized = false;
+bool sensorError = false;
+bool transmissionError = false;
+
+DhtSensor* sensor = nullptr;
+StatusLed* statusLed = nullptr;
+TemperatureDisplay* display = nullptr;
+
+MqttClient mqtt(
+    node::config.node_id,
+    node::config.mqtt_host,
+    node::config.mqtt_port
+);
+UdpTransport udp(
+    node::config.local_port,
+    node::config.server_address,
+    node::config.server_port
+);
 
 // Status rolling window (one per link, so a reading delivered on one link is not resent on
 // it when only the other link was down). Kept in SPIFFS: survives a restart.
 Spool mqttSpool("/spool_mqtt.bin", node::spool_capacity);
 Spool udpSpool("/spool_udp.bin", node::spool_capacity);
 
+// BLE fallback: while WiFi is down the latest reading is also advertised over BLE.
+BleBeacon bleBeacon;
+
 // Readings replayed per loop iteration and link, so a long backlog does not stall the
 // sensor loop or flood the MQTT outbox.
 constexpr int replay_batch = 5;
 
-// Declared before any function: the Arduino builder inserts auto-generated prototypes
-// above the first function definition.
-enum class UdpResult { Delivered, Rejected, Failed };
+// ---- Hardware ------------------------------------------------------------------------------
 
+bool wifiUp() {
+    return WiFi.status() == WL_CONNECTED;
+}
+
+void updateStatusLed() {
+    if (statusLed == nullptr) {
+        return;
+    }
+    statusLed->update(
+        wifiUp(),
+        sensorError,
+        transmissionError,
+        timeSynchronized,
+        mqtt.isConnected()
+    );
+}
+
+// Keeps the display button and status LED responsive while waiting.
+void serviceHardware() {
+    if (display != nullptr) {
+        display->update();
+    }
+    updateStatusLed();
+}
+
+void waitServicingHardware(unsigned long durationMs) {
+    const unsigned long start = millis();
+    while (millis() - start < durationMs) {
+        serviceHardware();
+        delay(10);
+    }
+}
+
+void initializeHardware() {
+    if (node::config.dht != nullptr) {
+        static DhtSensor configuredSensor(*node::config.dht);
+        sensor = &configuredSensor;
+        sensor->begin();
+    }
+    if (node::config.status_led != nullptr) {
+        static StatusLed configuredStatusLed(*node::config.status_led);
+        statusLed = &configuredStatusLed;
+        statusLed->begin();
+    }
+    if (node::config.display != nullptr) {
+        static TemperatureDisplay temperatureDisplay(*node::config.display);
+        display = &temperatureDisplay;
+        display->begin();
+    }
+}
+
+// ---- Readings ------------------------------------------------------------------------------
+
+/**
+ * @brief Obtain the current UTC timestamp using the ESP32 system clock.
+ * @return Timestamp formatted as YYYY-MM-DDTHH:MM:SSZ, or an empty string if
+ * clock retrieval or formatting fails. Failures are logged to Serial.
+ */
 std::string currentTimestamp() {
     struct tm timeinfo{};
     if (!getLocalTime(&timeinfo, 5000)) { // Increased timeout to 5 seconds
@@ -48,18 +132,30 @@ std::string currentTimestamp() {
     return timestamp;
 }
 
-// Builds and encodes the next reading. Returns an empty string if no reading is available.
+// Samples the sensor and encodes the next reading. Returns an empty string if no reading
+// is available.
 std::string buildReading() {
 
     if (sessionId.empty()) {
         sessionId = std::string("boot-") + std::to_string(esp_random());
         return {};
     }
+    if (sensor == nullptr) {
+        return {};
+    }
 
     float temperature = 0;
     float humidity = 0;
-    if (!dhtRead(temperature, humidity)) {
+    if (!sensor->read(temperature, humidity)) {
+        sensorError = true;
+        if (display != nullptr) {
+            display->showUnavailable();
+        }
         return {};
+    }
+    sensorError = false;
+    if (display != nullptr) {
+        display->showReadings(temperature, humidity);
     }
 
     const std::string timestamp = currentTimestamp();
@@ -120,19 +216,15 @@ std::string buildReading() {
     return {};
 }
 
-bool wifiUp() {
-    return WiFi.status() == WL_CONNECTED;
-}
-
 // ---- MQTT (Command Centre) ----------------------------------------------------------------
 
 bool mqttUp() {
-    return wifiUp() && mqttIsConnected();
+    return wifiUp() && mqtt.isConnected();
 }
 
 void deliverMqtt(const std::string& datagram) {
     // While a backlog exists the new reading joins it, so readings arrive in order.
-    if (mqttUp() && mqttSpool.empty() && mqttPublishReading(datagram)) {
+    if (mqttUp() && mqttSpool.empty() && mqtt.publishReading(datagram)) {
         return;
     }
     Serial.println("[mqtt] link down or backlog pending: buffering reading");
@@ -147,7 +239,7 @@ void replayMqtt() {
             mqttSpool.pop();
             continue;
         }
-        if (!mqttPublishReading(datagram)) {
+        if (!mqtt.publishReading(datagram)) {
             break;   // outbox full or client gone: retry next loop
         }
         mqttSpool.pop();
@@ -183,7 +275,7 @@ UdpResult udpDeliver(const std::string& datagram) {
         return UdpResult::Rejected;
     }
 
-    if (!udpSend(datagram)) {
+    if (!udp.send(datagram)) {
         return UdpResult::Failed;
     }
     if (qos != Qos::AtLeastOnce) {
@@ -192,7 +284,7 @@ UdpResult udpDeliver(const std::string& datagram) {
 
     const unsigned long start = millis();
     while (millis() - start < node::config.response_timeout_ms) {
-        switch (udpReceiveResponse(identity.session_id, identity.seq)) {
+        switch (udp.receiveResponse(identity.session_id, identity.seq)) {
             case UdpResponse::Ack:
                 return UdpResult::Delivered;
             case UdpResponse::Reject:
@@ -200,6 +292,7 @@ UdpResult udpDeliver(const std::string& datagram) {
             default:
                 break;
         }
+        serviceHardware();
         delay(10);
     }
     Serial.println("[udp] no ACK from alert server");
@@ -207,8 +300,12 @@ UdpResult udpDeliver(const std::string& datagram) {
 }
 
 void deliverUdp(const std::string& datagram) {
-    if (udpSpool.empty() && udpDeliver(datagram) != UdpResult::Failed) {
-        return;
+    if (udpSpool.empty()) {
+        const UdpResult result = udpDeliver(datagram);
+        transmissionError = result == UdpResult::Failed;
+        if (result != UdpResult::Failed) {
+            return;
+        }
     }
     Serial.println("[udp] link down or backlog pending: buffering reading");
     udpSpool.push(datagram);
@@ -223,16 +320,51 @@ void replayUdp() {
             continue;
         }
         if (udpDeliver(datagram) == UdpResult::Failed) {
+            transmissionError = true;
             break;   // still down: keep it and retry next loop
         }
+        transmissionError = false;
         udpSpool.pop();
         Serial.printf("[udp] replayed buffered reading, %u left\n", udpSpool.size());
     }
 }
 
+// ---- BLE fallback (alert server) ---------------------------------------------------------
+
+// Advertises the reading while WiFi is down. One-way and best effort: the reading also stays
+// in the spools and is replayed over UDP/MQTT later; the server ignores the duplicate.
+void deliverBle(const std::string& datagram) {
+    if (!node::config.ble_fallback || wifiUp()) {
+        return;
+    }
+    try {
+        const Message message = decode(datagram);
+        const auto* reading = std::get_if<Reading>(&message);
+        if (reading == nullptr) {
+            return;
+        }
+        const auto payload = common::ble::encodeReading(*reading);
+        if (!payload) {
+            Serial.println("[ble] reading does not fit in an advertisement");
+            return;
+        }
+        bleBeacon.advertise(*payload);
+    }
+    catch (const std::exception& error) {
+        Serial.print("[ble] could not advertise reading: ");
+        Serial.println(error.what());
+    }
+}
+
+// ---- Arduino entry points -----------------------------------------------------------------
+
+/**
+ * @brief Initialize Serial, the hardware, the spools, Wi-Fi, UTC time, BLE, UDP and MQTT.
+ */
 void setup() {
 
     Serial.begin(node::config.serial_baud);
+    initializeHardware();
 
     // Mount SPIFFS first: readings buffered before a restart are replayed once the links
     // are back. Failure is not fatal; the node then runs without a rolling window.
@@ -246,36 +378,61 @@ void setup() {
     WiFi.setAutoReconnect(true);
     WiFi.begin(node::config.wifi_ssid, node::config.wifi_password);
 
-    while (WiFi.status() != WL_CONNECTED) {
+    // Bounded wait: without WiFi the node still runs (spools + BLE fallback) and WiFi keeps
+    // reconnecting in the background.
+    const unsigned long wifiStart = millis();
+    while (!wifiUp() && millis() - wifiStart < node::config.wifi_connect_timeout_ms) {
+        updateStatusLed();
         delay(500);
         Serial.print(".");
     }
 
-    Serial.println("\nWiFi connected!");
+    Serial.println(wifiUp() ? "\nWiFi connected!" : "\nWiFi not available, continuing without it");
+    updateStatusLed();
 
     configTime(0, 0, "pool.ntp.org", "time.nist.gov");
     struct tm timeinfo{};
     timeSynchronized = getLocalTime(&timeinfo, node::config.time_sync_threshold_ms);
     Serial.println(timeSynchronized ? "Time synchronized!" : "Time synchronization failed");
 
-    dhtBegin();
+    if (node::config.ble_fallback) {
+        bleBeacon.begin();
+    }
 
     Serial.print("ESP32 IP: ");
     Serial.println(WiFi.localIP());
 
-    udpBegin();
+    transmissionError = !udp.begin();
 
-    mqttStart();
+    mqtt.begin();
 }
 
+/**
+ * @brief Take a reading, deliver it on every link (buffering what cannot be delivered),
+ * replay buffered readings, and wait before the next cycle.
+ */
 void loop() {
 
     const std::string datagram = buildReading();
+
+    // Booted without WiFi: SNTP syncs in the background once WiFi is up.
+    if (!timeSynchronized) {
+        struct tm timeinfo{};
+        if (getLocalTime(&timeinfo, 0)) {
+            timeSynchronized = true;
+            Serial.println("Time synchronized!");
+        }
+    }
+
+    if (wifiUp()) {
+        bleBeacon.stop();
+    }
 
     if (!datagram.empty()) {
         // Same JSON to the Command Centre; it accepts the UDP envelope as-is.
         deliverMqtt(datagram);
         deliverUdp(datagram);
+        deliverBle(datagram);
     }
 
     // Send what was buffered during an outage (or before a restart) once a link is back.
@@ -286,5 +443,5 @@ void loop() {
         Serial.printf("[spool] pending: mqtt=%u udp=%u\n", mqttSpool.size(), udpSpool.size());
     }
 
-    delay(node::config.reading_delay_ms);
+    waitServicingHardware(node::config.reading_delay_ms);
 }

@@ -25,6 +25,8 @@ TEST(ServerStats, HeartbeatBeforeAnyReading) {
     EXPECT_EQ(heartbeat["invalidDatagrams"], 0);
     EXPECT_EQ(heartbeat["storageErrors"], 0);
     EXPECT_TRUE(heartbeat["lastReading"].is_null());
+    EXPECT_TRUE(heartbeat["ble"].is_array());
+    EXPECT_TRUE(heartbeat["ble"].empty());
 }
 
 TEST(ServerStats, HeartbeatCountsAndLastReading) {
@@ -42,4 +44,19 @@ TEST(ServerStats, HeartbeatCountsAndLastReading) {
     EXPECT_EQ(heartbeat["storageErrors"], 2);
     EXPECT_EQ(heartbeat["lastReading"]["nodeId"], "esp32-002");
     EXPECT_EQ(heartbeat["lastReading"]["secondsAgo"], 3);
+}
+
+TEST(ServerStats, HeartbeatListsNodesHeardOverBle) {
+    ServerStats stats(start);
+    stats.ble_reading_received("esp32-002", start + 10s);
+    stats.ble_reading_received("esp32-001", start + 15s);
+    stats.ble_reading_received("esp32-002", start + 18s);   // latest BLE reading wins
+
+    const auto heartbeat = nlohmann::json::parse(stats.heartbeat_json(8080, start + 20s));
+
+    ASSERT_EQ(heartbeat["ble"].size(), 2u);
+    EXPECT_EQ(heartbeat["ble"][0]["nodeId"], "esp32-001");
+    EXPECT_EQ(heartbeat["ble"][0]["secondsAgo"], 5);
+    EXPECT_EQ(heartbeat["ble"][1]["nodeId"], "esp32-002");
+    EXPECT_EQ(heartbeat["ble"][1]["secondsAgo"], 2);
 }

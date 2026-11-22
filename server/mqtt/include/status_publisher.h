@@ -28,6 +28,7 @@ public:
 
     bool connected() const noexcept { return m_mqtt.connected(); }
     void reading_received(const std::string& node_id) { m_stats.reading_received(node_id); }
+    void ble_reading_received(const std::string& node_id) { m_stats.ble_reading_received(node_id); }
     void invalid_datagram() noexcept { m_stats.invalid_datagram(); }
     void storage_error() noexcept { m_stats.storage_error(); }
 

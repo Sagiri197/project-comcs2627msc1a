@@ -1,0 +1,74 @@
+@startuml system_v2
+title System Overview v2 - ESP32 Nodes and Raspberry Pi 5 (Alert Server + Command Centre)
+
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam nodesep 60
+skinparam ranksep 70
+
+legend right
+  |= Line |= Protocol |
+  | <color:black>━━</color> | MQTT |
+  | <color:red>━━</color> | UDP (JSON datagrams, protocol v1) |
+  | <color:blue>╍╍</color> | BLE (readings) |
+  | <color:gray>┄┄</color> | DHCP / DNS / NTP |
+  QoS 1 readings are stored, then answered
+  with an ACK / reject to the sending ESP32.
+  All devices are Wi-Fi clients of the AP
+  hosted by the Raspberry Pi 5.
+endlegend
+
+frame "Wi-Fi network comcs-cell1 (192.168.50.0/24)" as WLAN {
+
+  node "Raspberry Pi 5\n192.168.50.1 (as.comcs.lan / cc.comcs.lan)" as PI {
+
+    component "Wi-Fi AP\n+ DHCP / DNS / NTP" as AP
+
+    node "Command Centre" as CCBOX {
+      node "Docker container" as DOCKER {
+        component "Node-RED\n(:1880)" as CC
+        queue "MQTT Broker\nMosquitto (:1883)" as BROKER
+      }
+    }
+
+    node "Alert Server" as AS {
+      component "UDP socket\n(0.0.0.0:8080)" as UDP
+      component "BLE Receiver" as BLE
+      component "Daemon" as ALERT
+      database "readings.sqlite3" as DB
+    }
+  }
+
+  rectangle "Work cell" as CELL {
+    node "ESP32 A\n+ DHT11" as ESP1
+    node "ESP32 B\n+ DHT11" as ESP2
+    node "ESP32 C\n+ DHT11" as ESP3
+  }
+}
+
+' Network services from the AP to every node
+AP .[#gray]. CELL : DHCP / DNS / NTP
+
+' MQTT: telemetry from every node up to the Command Centre
+BROKER -[#black]up-> CC : MQTT
+ESP1 -[#black]up-> BROKER : MQTT
+ESP2 -[#black]up-> BROKER : MQTT
+ESP3 -[#black]up-> BROKER : MQTT
+
+' UDP: readings from every node to the Alert Server
+ESP1 -[#red]up-> UDP : UDP reading
+ESP2 -[#red]up-> UDP : UDP reading
+ESP3 -[#red]up-> UDP : UDP reading
+
+' BLE: readings from every node to the Alert Server
+ESP1 -[#blue,dashed]up-> BLE : BLE reading
+ESP2 -[#blue,dashed]up-> BLE : BLE reading
+ESP3 -[#blue,dashed]up-> BLE : BLE reading
+
+' Alert Server internals and alert forwarding over MQTT
+UDP -up-> ALERT : readings
+BLE -up-> ALERT : readings
+ALERT -right-> DB : store
+ALERT -[#black]up-> BROKER : MQTT alerts
+
+@enduml

@@ -63,11 +63,22 @@ TEST(AlertPublisher, PublishesTriggeredComparisonAsNonRetainedQosOneJson) {
     EXPECT_EQ(mqtt.published_qos, 1);
     EXPECT_FALSE(mqtt.published_retain);
     const auto payload = nlohmann::json::parse(mqtt.published_payload);
-    EXPECT_EQ(payload.at("nodeId"), "esp32-003");
-    EXPECT_EQ(payload.at("sessionId"), "session-1");
-    EXPECT_EQ(payload.at("seq"), 42);
-    EXPECT_DOUBLE_EQ(payload.at("temperatureDiff"), 3.2);
-    EXPECT_TRUE(payload.at("exceedsTemperatureThreshold").get<bool>());
+    EXPECT_EQ(payload.at("id"), "urn:ngsi-ld:Alert:esp32-003:session-1:42");
+    EXPECT_EQ(payload.at("type"), "Alert");
+    EXPECT_EQ(payload.at("category"), "environment");
+    EXPECT_EQ(payload.at("subCategory"), "temperatureDifferential");
+    EXPECT_EQ(payload.at("severity"), "medium");
+    EXPECT_EQ(payload.at("alertSource"), "urn:ngsi-ld:Device:alert-server");
+    EXPECT_EQ(payload.at("validFrom"), "2026-11-02T14:30:01Z");
+    EXPECT_FALSE(payload.at("dateIssued").get<std::string>().empty());
+    EXPECT_FALSE(payload.at("description").get<std::string>().empty());
+
+    const auto& data = payload.at("data");
+    EXPECT_EQ(data.at("nodeId"), "esp32-003");
+    EXPECT_EQ(data.at("sessionId"), "session-1");
+    EXPECT_EQ(data.at("seq"), 42);
+    EXPECT_DOUBLE_EQ(data.at("temperatureDiff"), 3.2);
+    EXPECT_TRUE(data.at("exceedsTemperatureThreshold").get<bool>());
 }
 
 TEST(AlertPublisher, DoesNotPublishWhenNoAlertConditionIsSet) {

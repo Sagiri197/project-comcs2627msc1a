@@ -32,7 +32,7 @@ std::optional<AlertLogic::ComparisonResult> AlertLogic::processReading(
     std::optional<ComparisonResult> comparison;
     logReading(reading);
 
-    if (auto last = m_store.getLastReading()) {
+    if (auto last = m_store.getLastReadingBefore(reading.identity)) {
         if (elapsed <= m_max_comparison_gap) {
             comparison = compareWithLast(
                 reading, *last, std::chrono::duration_cast<std::chrono::milliseconds>(elapsed));
@@ -42,7 +42,7 @@ std::optional<AlertLogic::ComparisonResult> AlertLogic::processReading(
                          m_max_comparison_gap.count());
         }
     } else {
-        spdlog::info("First reading received, no comparison yet");
+        spdlog::info("No prior reading from this ESP, no comparison");
     }
 
     m_last_reading_time = now;

@@ -51,6 +51,11 @@ struct Config {
     unsigned long time_sync_threshold_ms;
     unsigned long response_timeout_ms;
     unsigned long reading_delay_ms;
+    // How long setup() waits for WiFi before running without it (WiFi keeps reconnecting
+    // in the background; readings go to the spools and, if enabled, over BLE).
+    unsigned long wifi_connect_timeout_ms = 15000;
+    // Advertise readings over BLE while WiFi is down. node_id must be <= 10 characters.
+    bool ble_fallback = true;
     const StatusLedConfig* status_led = nullptr;
     const DisplayConfig* display = nullptr;
 };

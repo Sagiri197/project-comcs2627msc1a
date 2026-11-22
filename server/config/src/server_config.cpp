@@ -69,5 +69,11 @@ ServerConfig load_server_config(const std::string& path) {
         }
     }
 
+    // Optional section: configs written before BLE support keep working (BLE disabled).
+    config.ble.enabled = reader.has("ble", "enabled") && reader.get_bool("ble", "enabled");
+    if (reader.has("ble", "adapter")) {
+        config.ble.adapter = reader.get("ble", "adapter");
+    }
+
     return config;
 }

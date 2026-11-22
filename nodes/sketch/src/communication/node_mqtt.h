@@ -11,7 +11,8 @@ public:
 
     void begin();
     bool isConnected() const;
-    void publishReading(const std::string& json);
+    // Queues a reading (QoS 1, retried by the client). False if it could not be queued.
+    bool publishReading(const std::string& json);
 
 private:
     static void onEvent(void* context, esp_event_base_t eventBase,

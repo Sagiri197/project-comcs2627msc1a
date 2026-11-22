@@ -25,7 +25,9 @@ inline constexpr Config config{
     .serial_baud = 115200,
     .time_sync_threshold_ms = 10000,
     .response_timeout_ms = 1000,
-    .reading_delay_ms = 3000
+    .reading_delay_ms = 3000,
+    .wifi_connect_timeout_ms = 15000,
+    .ble_fallback = true
 };
 
 }

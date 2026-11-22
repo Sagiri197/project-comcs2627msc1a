@@ -10,7 +10,6 @@
 #include <cstdlib>
 #include <exception>
 #include <iostream>
-#include <memory>
 #include <string>
 #include <thread>
 
@@ -70,7 +69,8 @@ int main(int argc, char** argv) {
             spdlog::info("MQTT disabled by configuration");
         }
         
-        AlertServer server(store, logic, {config.udp.bind_address, config.udp.port}, mqtt_config);
+        AlertServer server(store, logic, {config.udp.bind_address, config.udp.port}, mqtt_config,
+                           config.ble);
         spdlog::info("UDP server listening on port {}", config.udp.port);
 
         std::signal(SIGINT, request_stop);
