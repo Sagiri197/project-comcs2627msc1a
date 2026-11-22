@@ -114,6 +114,8 @@ Os emails de alerta são enviados por um request HTTP para um flow de Microsoft 
 
 <img src="./images/flow.png" alt="" style="width:500px;"/>
 
+![alt text](images/email.png)
+
 ### ESPs
 
 #### Hardware <!-- omit in toc -->
@@ -122,7 +124,7 @@ Cada nó usa um ESP32 (ou S3, configuravel) e um sensor DHT11 para medir tempera
 
 Existem três perfis de configuração, com identificadores e coordenadas configuradas. A hora é obtida através de NTP, se não estiver sincronizada, a leitura não é enviada.
 
-Para hardware extra os perfis também defininem variáveis opcionais com o pinout desejado do nó para cada componente (null para ignorar), os componentes em questão sºao um LED RGB para comunicar o estado de execução, um display de sete segmentos, e um motor com uma ventoinha para um mecanismo de cooling.
+Para hardware extra os perfis também defininem variáveis opcionais com o pinout desejado do nó para cada componente (null para ignorar), os componentes em questão são um LED RGB para comunicar o estado de execução, um display de sete segmentos.
 
 As esquemáticas do circuito idealizadas pela equipa são as seguintes:
 <img src="./images/esp32_controller.svg" alt="" style="width:300px; background-color: white;"/>
@@ -153,6 +155,21 @@ Node-RED: http://192.168.60.1:1880
 Dashboard: http://192.168.60.1:1880/dashboard
 
 MQTT: 192.168.60.1:1883
+
+#### Alertas no command centre <!-- omit in toc -->
+![alt text](images/image.png)
+
+#### Cálculos estatísticos no command centre <!-- omit in toc -->
+![alt text](images/image-1.png)
+
+#### Histórico no command centre <!-- omit in toc -->
+![alt text](images/image-2.png)
+
+#### Ligações no command centre <!-- omit in toc -->
+![alt text](images/image-3.png)
+
+#### BLE no command centre <!-- omit in toc -->
+![alt text](images/image-4.png)
 
 ### Setup servidor
 
@@ -186,9 +203,6 @@ Output esperado:
 
 ![alt text](images/server_logs.png)
 
-#### Email <!-- omit in toc -->
-![alt text](images/email.png)
-
 ### Setup ESP
 
 Disponibilizamos um Makefile para automatizar o processo de compilação e upload.
@@ -204,18 +218,3 @@ Nestes ficheiros podem ser configuradas as definições para cada Node, como o S
 
 A este ponto o serial monitor deverá mostrar os seguintes logs:
 ![alt text](images/monitor_logs.png)
-
-#### Alertas no command centre <!-- omit in toc -->
-![alt text](images/image.png)
-
-#### Cálculos estatísticos no command centre <!-- omit in toc -->
-![alt text](images/image-1.png)
-
-#### Histórico no command centre <!-- omit in toc -->
-![alt text](images/image-2.png)
-
-#### Ligações no command centre <!-- omit in toc -->
-![alt text](images/image-3.png)
-
-#### BLE no command centre <!-- omit in toc -->
-![alt text](images/image-4.png)
