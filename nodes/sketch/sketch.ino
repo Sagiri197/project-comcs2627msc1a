@@ -56,8 +56,6 @@ BleBeacon bleBeacon;
 // sensor loop or flood the MQTT outbox.
 constexpr int replay_batch = 5;
 
-// ---- Hardware ------------------------------------------------------------------------------
-
 bool wifiUp() {
     return WiFi.status() == WL_CONNECTED;
 }
@@ -108,8 +106,6 @@ void initializeHardware() {
         display->begin();
     }
 }
-
-// ---- Readings ------------------------------------------------------------------------------
 
 /**
  * @brief Obtain the current UTC timestamp using the ESP32 system clock.
@@ -216,7 +212,9 @@ std::string buildReading() {
     return {};
 }
 
-// ---- MQTT (Command Centre) ----------------------------------------------------------------
+bool wifiUp() {
+    return WiFi.status() == WL_CONNECTED;
+}
 
 bool mqttUp() {
     return wifiUp() && mqtt.isConnected();
@@ -247,11 +245,6 @@ void replayMqtt() {
     }
 }
 
-// ---- UDP (alert server) -------------------------------------------------------------------
-
-// Sends one reading. With QoS AtLeastOnce the server ACKs every reading, so delivery is
-// confirmed by the ACK; with BestEffort the server never answers, so only local failures
-// (WiFi down, DNS/socket error) can be detected.
 UdpResult udpDeliver(const std::string& datagram) {
     if (!wifiUp()) {
         return UdpResult::Failed;
@@ -329,8 +322,6 @@ void replayUdp() {
     }
 }
 
-// ---- BLE fallback (alert server) ---------------------------------------------------------
-
 // Advertises the reading while WiFi is down. One-way and best effort: the reading also stays
 // in the spools and is replayed over UDP/MQTT later; the server ignores the duplicate.
 void deliverBle(const std::string& datagram) {
@@ -355,8 +346,6 @@ void deliverBle(const std::string& datagram) {
         Serial.println(error.what());
     }
 }
-
-// ---- Arduino entry points -----------------------------------------------------------------
 
 /**
  * @brief Initialize Serial, the hardware, the spools, Wi-Fi, UTC time, BLE, UDP and MQTT.
